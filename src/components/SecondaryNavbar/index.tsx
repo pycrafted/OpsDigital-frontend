@@ -6,17 +6,17 @@ import DropdownUser from '../Header/DropdownUser';
 
 const SecondaryNavbar = () => {
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `inline-flex items-center rounded-md px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap underline decoration-gray-600 dark:decoration-white underline-offset-2 ${
+    `inline-flex items-center rounded-md px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap underline underline-offset-2 decoration-gray-400 dark:decoration-white ${
       isActive
         ? 'bg-primary text-white dark:bg-primary dark:text-white'
-        : 'text-bodydark1 hover:bg-gray-100 hover:text-black dark:hover:bg-meta-4 dark:hover:text-white'
+        : 'text-gray-700 hover:bg-gray-100 hover:text-black dark:text-bodydark1 dark:hover:bg-meta-4 dark:hover:text-white'
     }`;
 
   const dashboardLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors whitespace-nowrap border-2 !text-white ${
+    `inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors whitespace-nowrap border-2 ${
       isActive
-        ? 'bg-primary border-primary dark:bg-primary dark:border-primary'
-        : 'border-primary bg-primary/5 hover:bg-primary/10 dark:border-primary dark:bg-primary/10 dark:hover:bg-primary/20'
+        ? 'bg-primary border-primary text-white dark:bg-primary dark:border-primary dark:text-white'
+        : 'border-primary bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary dark:border-primary dark:bg-primary/10 dark:text-white dark:hover:bg-primary/20'
     }`;
 
   return (

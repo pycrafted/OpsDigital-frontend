@@ -7,9 +7,16 @@ import './css/satoshi.css';
 import 'jsvectormap/dist/css/jsvectormap.css';
 import 'flatpickr/dist/flatpickr.min.css';
 
-// Mode sombre unique : forcer la classe dark sur le document
-document.documentElement.classList.add('dark');
-document.body.classList.add('dark');
+// Appliquer le thème sauvegardé (navbar toggle) dès le chargement pour éviter un flash
+const savedTheme = localStorage.getItem('color-theme') as 'dark' | 'light' | null;
+const isDark = savedTheme === 'dark' || (!savedTheme && false); // défaut: light
+if (isDark) {
+  document.documentElement.classList.add('dark');
+  document.body.classList.add('dark');
+} else {
+  document.documentElement.classList.remove('dark');
+  document.body.classList.remove('dark');
+}
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

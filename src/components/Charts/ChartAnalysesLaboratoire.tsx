@@ -13,7 +13,8 @@ import {
 const EMBEDDED_WRAPPER_CLASS = 'flex min-h-0 w-full flex-1 flex-col items-start';
 
 const CHART_COLOR = '#3C50E0';
-const HOUR_COLORS = { h7: '#3C50E0', h15: '#0891B2', h23: '#E85347' };
+// Même code couleur que les colonnes d'heure du tableau Analyses
+const HOUR_COLORS = { h7: '#fff2db', h15: '#e1f8f0', h23: '#feeaea' };
 
 type DurationFilter = 'day' | 'week' | 'month';
 
@@ -28,22 +29,38 @@ function parseValue(s: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** Données d'exemple pour la vue Semaine : une seule courbe, 7 jours × 3 relevés (7h, 15h, 23h) = 21 points */
+/** Données d'exemple pour la vue Semaine : même forme et valeurs que le graphe "Total Revenue / Total Sales" du tableau de bord */
 function getExampleWeekData(): { categories: string[]; series: { name: string; data: number[] }[] } {
-  const days = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
-  const hourSuffixes = ['7h', '15h', '23h'];
-  const categories: string[] = [];
-  const data: number[] = [];
-  const baseByDay = [0.72, 0.71, 0.73, 0.72, 0.74, 0.73, 0.72];
-  days.forEach((day, dayIndex) => {
-    hourSuffixes.forEach((h, hourIndex) => {
-      categories.push(`${day} ${h}`);
-      data.push(baseByDay[dayIndex] + hourIndex * 0.01 + (dayIndex % 3) * 0.005);
-    });
-  });
+  const categories = [
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+  ];
+
+  // Même forme que ChartOne, mais avec des libellés adaptés au contexte "mesures"
+  const series = [
+    {
+      name: 'Mesure 1',
+      data: [23, 11, 22, 27, 13, 22, 37, 21, 44, 22, 30, 45],
+    },
+    {
+      name: 'Mesure 2',
+      data: [30, 25, 36, 30, 45, 35, 64, 52, 59, 36, 39, 51],
+    },
+  ];
+
   return {
     categories,
-    series: [{ name: 'Relevés', data }],
+    series,
   };
 }
 
@@ -98,7 +115,8 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
     const productRow = row[selectedProduct];
     let values = hours.map((h) => parseValue(productRow[h]));
     if (values.every((v) => v === 0)) {
-      values = [0.72, 0.71, 0.73]; // exemple pour le graphique jour (ne pas afficher 0)
+      // Valeurs d'exemple pour la vue Jour : 1er = 0.72, 2ème = 0.54, 3ème = 0.93
+      values = [0.72, 0.54, 0.93];
     }
     const series: { name: string; data: number[] }[] = [
       { name: productLabels[selectedProduct], data: values },
@@ -107,14 +125,15 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
   }, [data, selectedMeasure, selectedProduct, duration]);
 
   const isDay = duration === 'day';
+  const isWeek = duration === 'week';
   const xTitle = duration === 'day' ? 'Heure' : duration === 'week' ? 'Jour' : 'Jour (1 mois)';
 
-  /** Marqueurs discrets : couleur selon 7h / 15h / 23h (Jour = 3 points, Semaine = 21, Mois = 90) */
+  /** Marqueurs discrets : utilisés uniquement pour la vue Mois (line chart) */
   const discreteMarkers = useMemo(() => {
-    if (chartData.series.length === 0) return undefined;
+    if (isDay || isWeek || chartData.series.length === 0) return undefined;
     const count = chartData.series[0].data.length;
     const hourColors = [HOUR_COLORS.h7, HOUR_COLORS.h15, HOUR_COLORS.h23];
-    const size = duration === 'month' ? 3 : duration === 'day' ? 6 : 5;
+    const size = duration === 'month' ? 3 : 5;
     return Array.from({ length: count }, (_, i) => ({
       seriesIndex: 0,
       dataPointIndex: i,
@@ -123,10 +142,188 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
       size,
       strokeWidth: 1,
     }));
-  }, [duration, chartData.series]);
+  }, [duration, chartData.series, isDay, isWeek]);
 
-  const options: ApexOptions = useMemo(
-    () => ({
+  const options: ApexOptions = useMemo(() => {
+    if (isDay) {
+      // Vue Jour : design type ChartTwo, mais avec une couleur différente pour chaque plot (7h, 15h, 23h)
+      return {
+        colors: [HOUR_COLORS.h7, HOUR_COLORS.h15, HOUR_COLORS.h23],
+        chart: {
+          fontFamily: 'Satoshi, sans-serif',
+          type: 'bar',
+          height: 335,
+          stacked: true,
+          toolbar: {
+            show: false,
+          },
+          zoom: {
+            enabled: false,
+          },
+        },
+        stroke: {
+          width: 2,
+          colors: [HOUR_COLORS.h7, HOUR_COLORS.h15, HOUR_COLORS.h23],
+        },
+        responsive: [
+          {
+            breakpoint: 1536,
+            options: {
+              plotOptions: {
+                bar: {
+                  borderRadius: 0,
+                  columnWidth: '25%',
+                },
+              },
+            },
+          },
+        ],
+        plotOptions: {
+          bar: {
+            horizontal: false,
+            borderRadius: 0,
+            // Pour 3 barres (7h, 15h, 23h) on réduit encore pour avoir des plots plus fins.
+            columnWidth: '10%',
+            borderRadiusApplication: 'end',
+            borderRadiusWhenStacked: 'last',
+            distributed: true,
+          },
+        },
+        dataLabels: {
+          enabled: false,
+        },
+        xaxis: {
+          type: 'category',
+          categories: chartData.categories,
+        },
+        legend: {
+          position: 'top',
+          horizontalAlign: 'left',
+          fontFamily: 'Satoshi',
+          fontWeight: 500,
+          fontSize: '14px',
+          markers: {
+            radius: 99,
+          },
+        },
+        fill: {
+          opacity: 1,
+        },
+        tooltip: {
+          y: { formatter: (val: number) => (Number.isFinite(val) ? String(val) : '') },
+        },
+      };
+    }
+
+    if (isWeek) {
+      // Vue Semaine : design type ChartOne, fond transparent
+      return {
+        legend: {
+          show: false,
+          position: 'top',
+          horizontalAlign: 'left',
+        },
+        colors: ['#3C50E0', '#80CAEE'],
+        chart: {
+          fontFamily: 'Satoshi, sans-serif',
+          height: 335,
+          type: 'area',
+          background: 'transparent',
+          dropShadow: {
+            enabled: true,
+            color: '#623CEA14',
+            top: 10,
+            blur: 4,
+            left: 0,
+            opacity: 0.1,
+          },
+          toolbar: {
+            show: false,
+          },
+        },
+        responsive: [
+          {
+            breakpoint: 1024,
+            options: {
+              chart: {
+                height: 300,
+              },
+            },
+          },
+          {
+            breakpoint: 1366,
+            options: {
+              chart: {
+                height: 350,
+              },
+            },
+          },
+        ],
+        stroke: {
+          width: [2, 2],
+          curve: 'straight',
+        },
+        // Remplissage uniforme (même transparence de gauche à droite sous la courbe)
+        fill: {
+          type: 'solid',
+          opacity: 0.35,
+        },
+        grid: {
+          xaxis: {
+            lines: {
+              show: true,
+            },
+          },
+          yaxis: {
+            lines: {
+              show: true,
+            },
+          },
+        },
+        dataLabels: {
+          enabled: false,
+        },
+        markers: {
+          size: 4,
+          colors: '#fff',
+          strokeColors: ['#3056D3', '#80CAEE'],
+          strokeWidth: 3,
+          strokeOpacity: 0.9,
+          strokeDashArray: 0,
+          fillOpacity: 1,
+          discrete: [],
+          hover: {
+            size: undefined,
+            sizeOffset: 5,
+          },
+        },
+        xaxis: {
+          type: 'category',
+          categories: chartData.categories,
+          axisBorder: {
+            show: false,
+          },
+          axisTicks: {
+            show: false,
+          },
+        },
+        yaxis: {
+          title: {
+            style: {
+              fontSize: '0px',
+            },
+          },
+          min: 0,
+          max: 100,
+        },
+        tooltip: {
+          y: { formatter: (val: number) => (Number.isFinite(val) ? String(val) : '') },
+        },
+      };
+    }
+
+    // Vue Mois : line chart avec marqueurs discrets
+    return {
       chart: {
         fontFamily: 'Satoshi, sans-serif',
         type: 'line',
@@ -154,7 +351,7 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
       },
       markers:
         discreteMarkers
-          ? { size: 0, discrete: discreteMarkers, hover: { size: duration === 'month' ? 4 : duration === 'day' ? 8 : 6 } }
+          ? { size: 0, discrete: discreteMarkers, hover: { size: duration === 'month' ? 4 : 6 } }
           : { size: 3, strokeWidth: 0, strokeColors: '#fff', hover: { size: 5 } },
       grid: {
         xaxis: { lines: { show: true } },
@@ -166,7 +363,7 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
         title: { text: xTitle, style: { fontSize: '12px' } },
         labels: {
           style: { fontSize: duration === 'month' ? '9px' : '11px' },
-          rotate: duration === 'month' || duration === 'week' ? -45 : 0,
+          rotate: duration === 'month' ? -45 : 0,
         },
         axisBorder: { show: false },
         axisTicks: { show: false },
@@ -181,9 +378,8 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
       tooltip: {
         y: { formatter: (val: number) => (Number.isFinite(val) ? String(val) : '') },
       },
-    }),
-    [chartData.categories, chartData.series, selectedMeasure, duration, isDay, xTitle, discreteMarkers]
-  );
+    };
+  }, [chartData.categories, duration, isDay, isWeek, xTitle, discreteMarkers, selectedMeasure]);
 
   return (
     <div className={embedded ? EMBEDDED_WRAPPER_CLASS : ''}>
@@ -241,7 +437,8 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
           <ReactApexChart
             options={options}
             series={chartData.series}
-            type="line"
+            className={isWeek ? 'analyses-week-chart' : undefined}
+            type={isDay ? 'bar' : isWeek ? 'area' : 'line'}
             height={350}
           />
         ) : (

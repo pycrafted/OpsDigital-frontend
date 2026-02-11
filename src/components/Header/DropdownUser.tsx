@@ -15,7 +15,7 @@ const DropdownUser = () => {
         aria-label="Menu utilisateur"
       >
         <svg
-          className="h-5 w-5 fill-current text-bodydark1 dark:text-white"
+          className="h-5 w-5 fill-current text-gray-600 dark:text-white"
           viewBox="0 0 22 22"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
@@ -44,14 +44,14 @@ const DropdownUser = () => {
               <span className="block truncate text-sm font-medium text-black dark:text-white">
                 Abdoulaye lah
               </span>
-              <span className="block truncate text-xs text-bodydark2">Ingénieur logiciel</span>
+              <span className="block truncate text-xs text-gray-500 dark:text-bodydark2">Ingénieur logiciel</span>
             </div>
           </div>
           <ul className="flex flex-col gap-5 border-b border-stroke px-6 py-7.5 dark:border-strokedark">
             <li>
               <Link
                 to="/profile"
-                className="flex items-center gap-3.5 text-sm font-medium duration-300 ease-in-out hover:text-primary lg:text-base"
+                className="flex items-center gap-3.5 text-sm font-medium text-gray-700 duration-300 ease-in-out hover:text-primary dark:text-white lg:text-base"
               >
                 <svg
                   className="fill-current"
@@ -70,13 +70,13 @@ const DropdownUser = () => {
                     fill=""
                   />
                 </svg>
-                My Profile
+                Mon profil
               </Link>
             </li>
             <li>
               <Link
                 to="/settings"
-                className="flex items-center gap-3.5 text-sm font-medium duration-300 ease-in-out hover:text-primary lg:text-base"
+                className="flex items-center gap-3.5 text-sm font-medium text-gray-700 duration-300 ease-in-out hover:text-primary dark:text-white lg:text-base"
               >
                 <svg
                   className="fill-current"
@@ -95,13 +95,13 @@ const DropdownUser = () => {
                     fill=""
                   />
                 </svg>
-                Account Settings
+                Paramètres du compte
               </Link>
             </li>
           </ul>
           <Link
             to="/login"
-            className="flex w-full items-center gap-3.5 px-6 py-4 text-sm font-medium duration-300 ease-in-out hover:text-primary lg:text-base"
+            className="flex w-full items-center gap-3.5 px-6 py-4 text-sm font-medium text-gray-700 duration-300 ease-in-out hover:text-primary dark:text-white lg:text-base"
           >
             <svg
               className="fill-current"
@@ -120,7 +120,7 @@ const DropdownUser = () => {
                 fill=""
               />
             </svg>
-            Log Out
+            Déconnexion
           </Link>
         </div>
       )}

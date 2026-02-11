@@ -42,12 +42,17 @@ const Saisie: React.FC = () => {
 
   return (
     <>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-black dark:text-black">
+      <div className="mb-6 border-b border-stroke pb-4 dark:border-strokedark">
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+          <span>Saisie opérationnelle</span>
+        </div>
+        <h1 className="text-2xl font-semibold text-black dark:text-white">
           Saisie des relevés
         </h1>
-        <p className="mt-1 text-bodydark2 dark:text-black">
-          Choisissez une feuille pour saisir les données du tableau correspondant. Un seul créneau à la fois, avec duplication possible depuis le créneau précédent.
+        <p className="mt-2 max-w-2xl text-sm text-bodydark2 dark:text-white/90">
+          Choisissez une feuille pour saisir les données du tableau correspondant. Un seul créneau à la fois, avec
+          duplication possible depuis le créneau précédent.
         </p>
       </div>
 

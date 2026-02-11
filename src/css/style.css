@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply font-satoshi font-normal text-base text-body bg-whiten relative z-1;
+    @apply font-satoshi font-normal text-base text-body bg-whiten relative z-1 dark:bg-[#1a222c];
   }
 }
 
@@ -78,6 +78,12 @@
 }
 .apexcharts-tooltip-series-group {
   @apply !pl-1.5;
+}
+
+/* Graphique semaine Analyses laboratoire : fond vraiment transparent comme sur le tableau de bord */
+.analyses-week-chart .apexcharts-canvas,
+.analyses-week-chart svg {
+  background-color: transparent !important;
 }
 
 .flatpickr-wrapper {

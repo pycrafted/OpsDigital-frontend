@@ -6,11 +6,16 @@ const useColorMode = () => {
 
   useEffect(() => {
     const className = 'dark';
-    const bodyClass = window.document.body.classList;
+    const root = window.document.documentElement;
+    const body = window.document.body;
 
-    colorMode === 'dark'
-      ? bodyClass.add(className)
-      : bodyClass.remove(className);
+    if (colorMode === 'dark') {
+      root.classList.add(className);
+      body.classList.add(className);
+    } else {
+      root.classList.remove(className);
+      body.classList.remove(className);
+    }
   }, [colorMode]);
 
   return [colorMode, setColorMode];
