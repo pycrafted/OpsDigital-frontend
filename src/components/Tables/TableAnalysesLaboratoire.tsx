@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   AnalyseRow,
-  createInitialAnalysesData,
   hourLabels,
   hours,
   productLabels,
@@ -10,49 +9,77 @@ import {
   type ProductKey,
 } from '../../data/analysesLaboratoire';
 
-const hourColors = { h7: '#fff2db', h15: '#e1f8f0', h23: '#feeaea' };
-
 export interface TableAnalysesLaboratoireProps {
   data: AnalyseRow[];
   onDataChange: (data: AnalyseRow[]) => void;
+  selectedDate: string;
+  onDateChange: (date: string) => void;
+  loading?: boolean;
+  /** Appelé au clic sur "Valider" pour sauvegarder les modifications (après édition directe). */
+  onValidate?: () => void;
+  /** true pendant l’envoi de la sauvegarde (désactive le bouton Valider). */
+  saving?: boolean;
+  /** Afficher le bouton Valider (quand il y a des modifications non sauvegardées). */
+  showValidateButton?: boolean;
+  /** Données telles que sauvegardées (pour surligner les cellules modifiées mais non sauvegardées). */
+  lastSavedData?: AnalyseRow[] | null;
 }
 
-const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ data, onDataChange }) => {
+const CHEVRON_DOWN = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden>
+    <path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" />
+  </svg>
+);
+
+const CHECK = (
+  <svg className="h-4 w-4 shrink-0 text-primary" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+  </svg>
+);
+
+const LOCK_CLOSED = (
+  <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+  </svg>
+);
+
+const LOCK_OPEN = (
+  <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+    <path fillRule="evenodd" d="M14.5 1A4.5 4.5 0 0010 5.5V9H3a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-1V5.5A4.5 4.5 0 0014.5 1zM12 9V5.5a2 2 0 10-4 0V9h4z" clipRule="evenodd" />
+  </svg>
+);
+
+const VALIDATE_ICON = (
+  <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+  </svg>
+);
+
+const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ data, onDataChange, selectedDate, onDateChange, loading = false, onValidate, saving = false, showValidateButton = false, lastSavedData = null }) => {
   const measures = React.useMemo(() => data.map((row) => row.property), [data]);
-  const [selectedDate, setSelectedDate] = React.useState<string>(() => {
-    const today = new Date();
-    return today.toISOString().slice(0, 10);
-  });
   const [selectedHours, setSelectedHours] = React.useState<string[]>(['h7', 'h15', 'h23']);
   const [selectedProducts, setSelectedProducts] = React.useState<string[]>(() => [...products]);
   const [selectedMeasures, setSelectedMeasures] = React.useState<string[]>(() => measures);
-  const [isDarkMode, setIsDarkMode] = React.useState(false);
-  const [currentPage, setCurrentPage] = React.useState(0);
+  const [canEdit, setCanEdit] = React.useState(false);
 
+  // Quand les données changent (ex. chargement API pour une autre date), afficher toutes les lignes
+  // en synchronisant la sélection des mesures avec les libellés reçus (backend peut utiliser une casse différente).
   React.useEffect(() => {
-    const checkDarkMode = () => {
-      setIsDarkMode(document.documentElement.classList.contains('dark'));
-    };
-    checkDarkMode();
-    const observer = new MutationObserver(checkDarkMode);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class'],
-    });
-    return () => observer.disconnect();
-  }, []);
+    if (measures.length > 0) {
+      setSelectedMeasures(measures);
+    }
+  }, [measures.join(',')]);
+
   const [showProductDropdown, setShowProductDropdown] = React.useState(false);
   const [showMeasureDropdown, setShowMeasureDropdown] = React.useState(false);
   const [showHourDropdown, setShowHourDropdown] = React.useState(false);
-  const [showDateDropdown, setShowDateDropdown] = React.useState(false);
   const productDropdownRef = React.useRef<HTMLDivElement>(null);
   const productTriggerRef = React.useRef<HTMLDivElement>(null);
   const measureDropdownRef = React.useRef<HTMLDivElement>(null);
   const measureTriggerRef = React.useRef<HTMLDivElement>(null);
   const hourDropdownRef = React.useRef<HTMLDivElement>(null);
   const hourTriggerRef = React.useRef<HTMLDivElement>(null);
-  const dateDropdownRef = React.useRef<HTMLDivElement>(null);
-  const dateTriggerRef = React.useRef<HTMLDivElement>(null);
+  const tableRef = React.useRef<HTMLTableElement>(null);
 
   const handleChange = (
     rowIndex: number,
@@ -63,340 +90,268 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
     const newData = [...data];
     newData[rowIndex] = {
       ...newData[rowIndex],
-      [product]: {
-        ...newData[rowIndex][product],
-        [hour]: value,
-      },
+      [product]: { ...newData[rowIndex][product], [hour]: value },
     };
     onDataChange(newData);
   };
 
   const handleHourToggle = (hour: string) => {
-    setSelectedHours((prev) => {
-      if (prev.includes(hour)) {
-        // Remove hour if already selected
-        return prev.filter((h) => h !== hour);
-      } else {
-        // Add hour if not selected
-        return [...prev, hour];
-      }
-    });
+    setSelectedHours((prev) =>
+      prev.includes(hour) ? prev.filter((h) => h !== hour) : [...prev, hour]
+    );
   };
-
   const handleProductToggle = (product: string) => {
-    setSelectedProducts((prev) => {
-      if (prev.includes(product)) {
-        // Remove product if already selected
-        return prev.filter((p) => p !== product);
-      } else {
-        // Add product if not selected
-        return [...prev, product];
-      }
-    });
+    setSelectedProducts((prev) =>
+      prev.includes(product) ? prev.filter((p) => p !== product) : [...prev, product]
+    );
   };
-
-  const removeProduct = (product: string) => {
-    setSelectedProducts((prev) => prev.filter((p) => p !== product));
-  };
-
   const handleMeasureToggle = (measure: string) => {
-    setSelectedMeasures((prev) => {
-      if (prev.includes(measure)) {
-        // Remove measure if already selected
-        return prev.filter((m) => m !== measure);
-      } else {
-        // Add measure if not selected
-        return [...prev, measure];
-      }
-    });
+    setSelectedMeasures((prev) =>
+      prev.includes(measure) ? prev.filter((m) => m !== measure) : [...prev, measure]
+    );
   };
 
-  // Filter hours based on selection
   const filteredHours = hours.filter((h) => selectedHours.includes(h));
-  // Filter products based on selection
   const filteredProducts = products.filter((p) => selectedProducts.includes(p));
-  
-  // Deux tableaux (pages) pour mieux utiliser l'espace pleine largeur
-  const PRODUCTS_PER_PAGE = 7;
-  const productGroups: typeof filteredProducts[] = [];
-  for (let i = 0; i < filteredProducts.length; i += PRODUCTS_PER_PAGE) {
-    productGroups.push(filteredProducts.slice(i, i + PRODUCTS_PER_PAGE));
-  }
-  
-  // Ensure currentPage is valid and reset if needed
-  const totalPages = Math.max(1, productGroups.length);
-  React.useEffect(() => {
-    if (currentPage >= totalPages) {
-      setCurrentPage(0);
-    }
-  }, [totalPages, currentPage]);
-  
-  const validPage = Math.min(currentPage, totalPages - 1);
-  const currentProducts = productGroups[validPage] || [];
-  
-  // Filter data based on selected measures
   const filteredData = data.filter((row) => selectedMeasures.includes(row.property));
 
-  // Close dropdowns when clicking outside
+  const totalRows = filteredData.length;
+  const totalCols = filteredProducts.length * filteredHours.length;
+
+  const handleTableKeyDown = (e: React.KeyboardEvent<HTMLTableElement>) => {
+    if (!canEdit) return;
+    const target = e.target as HTMLElement;
+    if (target.tagName !== 'INPUT' || target.getAttribute('data-cell') !== 'true') return;
+    const row = target.getAttribute('data-row');
+    const col = target.getAttribute('data-col');
+    if (row === null || col === null) return;
+    const rowIndex = parseInt(row, 10);
+    const colIndex = parseInt(col, 10);
+    if (Number.isNaN(rowIndex) || Number.isNaN(colIndex)) return;
+    let nextRow = rowIndex;
+    let nextCol = colIndex;
+    switch (e.key) {
+      case 'ArrowLeft':
+        if (colIndex > 0) nextCol = colIndex - 1;
+        else return;
+        break;
+      case 'ArrowRight':
+        if (colIndex < totalCols - 1) nextCol = colIndex + 1;
+        else return;
+        break;
+      case 'ArrowUp':
+        if (rowIndex > 0) nextRow = rowIndex - 1;
+        else return;
+        break;
+      case 'ArrowDown':
+        if (rowIndex < totalRows - 1) nextRow = rowIndex + 1;
+        else return;
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    const nextInput = tableRef.current?.querySelector<HTMLInputElement>(
+      `input[data-cell="true"][data-row="${nextRow}"][data-col="${nextCol}"]`
+    );
+    if (nextInput) {
+      nextInput.focus();
+    }
+  };
+
   React.useEffect(() => {
     const clickHandler = ({ target }: MouseEvent) => {
-      if (
-        measureDropdownRef.current &&
-        !measureDropdownRef.current.contains(target as Node) &&
-        !measureTriggerRef.current?.contains(target as Node)
-      ) {
-        setShowMeasureDropdown(false);
-      }
-      if (
-        hourDropdownRef.current &&
-        !hourDropdownRef.current.contains(target as Node) &&
-        !hourTriggerRef.current?.contains(target as Node)
-      ) {
-        setShowHourDropdown(false);
-      }
-      if (
-        productDropdownRef.current &&
-        !productDropdownRef.current.contains(target as Node) &&
-        !productTriggerRef.current?.contains(target as Node)
-      ) {
-        setShowProductDropdown(false);
-      }
-      if (
-        dateDropdownRef.current &&
-        !dateDropdownRef.current.contains(target as Node) &&
-        !dateTriggerRef.current?.contains(target as Node)
-      ) {
-        setShowDateDropdown(false);
-      }
+      if (measureDropdownRef.current && !measureDropdownRef.current.contains(target as Node) && !measureTriggerRef.current?.contains(target as Node)) setShowMeasureDropdown(false);
+      if (hourDropdownRef.current && !hourDropdownRef.current.contains(target as Node) && !hourTriggerRef.current?.contains(target as Node)) setShowHourDropdown(false);
+      if (productDropdownRef.current && !productDropdownRef.current.contains(target as Node) && !productTriggerRef.current?.contains(target as Node)) setShowProductDropdown(false);
     };
     document.addEventListener('click', clickHandler);
     return () => document.removeEventListener('click', clickHandler);
-  });
+  }, []);
+
+  const filterTriggerClass =
+    'flex cursor-pointer items-center gap-2 rounded-xl border border-stroke/70 bg-white/90 px-4 py-2.5 text-sm font-medium text-[#3c50e0] shadow-sm transition hover:border-primary/50 hover:bg-white hover:text-primary dark:border-strokedark dark:bg-boxdark dark:text-white dark:hover:border-primary dark:hover:bg-meta-4/80 dark:hover:text-white';
+  const dropdownPanelClass =
+    'absolute left-0 top-full z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark';
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-sm border-0 bg-whiten px-5 pt-6 pb-2.5 dark:bg-white sm:px-7.5 xl:pb-1">
-      {/* Filter Section */}
-      <div className="mb-4 flex shrink-0 flex-col items-center gap-4 sm:flex-row sm:flex-wrap sm:justify-center">
-        {/* Filtrer par date */}
-        <div className="relative w-full sm:w-auto" ref={dateDropdownRef}>
-          <div
-            ref={dateTriggerRef}
-            onClick={() => setShowDateDropdown(!showDateDropdown)}
-            className="flex cursor-pointer items-center gap-1.5 text-xs text-black dark:text-[#344256]"
-          >
-            <span>Date</span>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              className={`shrink-0 transition-transform ${showDateDropdown ? 'rotate-180' : ''}`}
-            >
-              <path
-                fillRule="evenodd"
-                clipRule="evenodd"
-                d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z"
-                fill="currentColor"
-              />
-            </svg>
-          </div>
-          {showDateDropdown && (
-            <div className="absolute left-0 top-full z-40 mt-1 rounded border border-stroke bg-white p-2 shadow dark:border-strokedark dark:bg-form-input">
-              <input
-                type="date"
-                value={selectedDate}
-                max={new Date().toISOString().slice(0, 10)}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full min-w-40 rounded border border-stroke bg-transparent py-1.5 pl-2 pr-2 text-xs text-black outline-none focus:border-primary dark:border-form-strokedark dark:text-white dark:focus:border-primary [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-70"
-              />
-            </div>
-          )}
+    <div className="relative flex min-h-0 flex-1 w-full flex-col gap-6 overflow-hidden">
+      {loading && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-white/80 dark:bg-boxdark/80">
+          <span className="text-sm font-medium text-primary">Chargement…</span>
         </div>
-
-        {/* Filtrer par mesure */}
-        <div className="relative w-full sm:w-auto" ref={measureDropdownRef}>
-          <div
-            ref={measureTriggerRef}
-            onClick={() => setShowMeasureDropdown(!showMeasureDropdown)}
-            className="flex cursor-pointer items-center gap-1.5 text-xs text-black dark:text-[#344256]"
-          >
-            <span>Filtrer par mesure</span>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              className={`shrink-0 transition-transform ${showMeasureDropdown ? 'rotate-180' : ''}`}
+      )}
+      {/* Barre de filtres (centrés) + bouton cadenas à droite */}
+      <div className="flex w-full flex-shrink-0 items-center gap-2">
+        <div className="flex-1" />
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {/* Mesure */}
+          <div className="relative" ref={measureDropdownRef}>
+            <button
+              type="button"
+              ref={measureTriggerRef}
+              onClick={() => setShowMeasureDropdown(!showMeasureDropdown)}
+              className={filterTriggerClass}
             >
-              <path
-                fillRule="evenodd"
-                clipRule="evenodd"
-                d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z"
-                fill="currentColor"
-              />
-            </svg>
-          </div>
-          {showMeasureDropdown && (
-              <div className="absolute left-0 top-full z-40 min-w-52 max-h-60 overflow-y-auto rounded bg-white shadow dark:bg-form-input">
+              Mesures
+              <span className={showMeasureDropdown ? 'rotate-180' : ''}>{CHEVRON_DOWN}</span>
+            </button>
+            {showMeasureDropdown && (
+              <div className={`${dropdownPanelClass} min-w-[14rem]`}>
                 {measures.map((measure) => {
                   const isSelected = selectedMeasures.includes(measure);
                   return (
-                    <div
+                    <button
                       key={measure}
-                      className={`cursor-pointer border-b border-stroke p-1.5 pl-2 text-xs hover:bg-primary/5 dark:border-form-strokedark ${
-                        isSelected ? 'bg-primary/10 dark:bg-primary/20' : ''
-                      }`}
+                      type="button"
                       onClick={() => handleMeasureToggle(measure)}
+                      className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${
+                        isSelected
+                          ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white'
+                          : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'
+                      }`}
                     >
-                      {isSelected && (
-                        <svg className="mr-1.5 inline h-3 w-3 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                      <span className={isSelected ? 'font-semibold text-primary dark:text-white' : 'text-black dark:text-white'}>
-                        {measure}
-                      </span>
-                    </div>
+                      {isSelected && CHECK}
+                      <span className={isSelected ? 'font-medium' : ''}>{measure}</span>
+                    </button>
                   );
                 })}
               </div>
             )}
-        </div>
-
-        {/* Filtrer par heure */}
-        <div className="relative w-full sm:w-auto" ref={hourDropdownRef}>
-          <div
-            ref={hourTriggerRef}
-            onClick={() => setShowHourDropdown(!showHourDropdown)}
-            className="flex cursor-pointer items-center gap-1.5 text-xs text-black dark:text-[#344256]"
-          >
-            <span>Filtrer par heure</span>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              className={`shrink-0 transition-transform ${showHourDropdown ? 'rotate-180' : ''}`}
-            >
-              <path
-                fillRule="evenodd"
-                clipRule="evenodd"
-                d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z"
-                fill="currentColor"
-              />
-            </svg>
           </div>
-          {showHourDropdown && (
-              <div className="absolute left-0 top-full z-40 min-w-52 max-h-60 overflow-y-auto rounded bg-white shadow dark:bg-form-input">
+
+          {/* Créneaux */}
+          <div className="relative" ref={hourDropdownRef}>
+            <button
+              type="button"
+              ref={hourTriggerRef}
+              onClick={() => setShowHourDropdown(!showHourDropdown)}
+              className={filterTriggerClass}
+            >
+              Créneaux
+              <span className={showHourDropdown ? 'rotate-180' : ''}>{CHEVRON_DOWN}</span>
+            </button>
+            {showHourDropdown && (
+              <div className={`${dropdownPanelClass} min-w-[10rem]`}>
                 {hours.map((hour) => {
                   const isSelected = selectedHours.includes(hour);
                   return (
-                    <div
+                    <button
                       key={hour}
-                      className={`cursor-pointer border-b border-stroke p-1.5 pl-2 text-xs hover:bg-primary/5 dark:border-form-strokedark ${
-                        isSelected ? 'bg-primary/10 dark:bg-primary/20' : ''
-                      }`}
+                      type="button"
                       onClick={() => handleHourToggle(hour)}
+                      className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${
+                        isSelected ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'
+                      }`}
                     >
-                      {isSelected && (
-                        <svg className="mr-1.5 inline h-3 w-3 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                      <span className={isSelected ? 'font-semibold text-primary dark:text-white' : 'text-black dark:text-white'}>
-                        {hourLabels[hour]}
-                      </span>
-                    </div>
+                      {isSelected && CHECK}
+                      {hourLabels[hour]}
+                    </button>
                   );
                 })}
               </div>
             )}
-        </div>
-
-        {/* Filtrer par produit */}
-        <div className="relative w-full sm:w-auto" ref={productDropdownRef}>
-          <div
-            ref={productTriggerRef}
-            onClick={() => setShowProductDropdown(!showProductDropdown)}
-            className="flex cursor-pointer items-center gap-1.5 text-xs text-black dark:text-[#344256]"
-          >
-            <span>Filtrer par produit</span>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              className={`shrink-0 transition-transform ${showProductDropdown ? 'rotate-180' : ''}`}
-            >
-              <path
-                fillRule="evenodd"
-                clipRule="evenodd"
-                d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z"
-                fill="currentColor"
-              />
-            </svg>
           </div>
-          {showProductDropdown && (
-              <div className="absolute left-0 top-full z-40 min-w-52 max-h-60 overflow-y-auto rounded bg-white shadow dark:bg-form-input">
+
+          {/* Produit */}
+          <div className="relative" ref={productDropdownRef}>
+            <button
+              type="button"
+              ref={productTriggerRef}
+              onClick={() => setShowProductDropdown(!showProductDropdown)}
+              className={filterTriggerClass}
+            >
+              Produits
+              <span className={showProductDropdown ? 'rotate-180' : ''}>{CHEVRON_DOWN}</span>
+            </button>
+            {showProductDropdown && (
+              <div className={`${dropdownPanelClass} min-w-[14rem]`}>
                 {products.map((product) => {
                   const isSelected = selectedProducts.includes(product);
                   return (
-                    <div
+                    <button
                       key={product}
-                      className={`cursor-pointer border-b border-stroke p-1.5 pl-2 text-xs hover:bg-primary/5 dark:border-form-strokedark ${
-                        isSelected ? 'bg-primary/10 dark:bg-primary/20' : ''
-                      }`}
+                      type="button"
                       onClick={() => handleProductToggle(product)}
+                      className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${
+                        isSelected ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'
+                      }`}
                     >
-                      {isSelected && (
-                        <svg className="mr-1.5 inline h-3 w-3 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                      <span className={isSelected ? 'font-semibold text-primary dark:text-white' : 'text-black dark:text-white'}>
-                        {productLabels[product]}
-                      </span>
-                    </div>
+                      {isSelected && CHECK}
+                      {productLabels[product]}
+                    </button>
                   );
                 })}
               </div>
             )}
+          </div>
+        </div>
+        <div className="flex flex-1 justify-end items-center gap-2">
+          {showValidateButton && (
+            <button
+              type="button"
+              onClick={() => onValidate?.()}
+              disabled={saving}
+              className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-stroke/70 bg-white/90 px-3 text-green-600 transition hover:border-green-500 hover:bg-white hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-strokedark dark:bg-boxdark dark:text-green-400 dark:hover:border-green-500 dark:hover:bg-meta-4/80 dark:hover:text-green-300"
+              aria-label="Valider et sauvegarder les modifications"
+            >
+              {VALIDATE_ICON}
+              <span className="text-sm font-medium text-inherit">{saving ? 'Sauvegarde…' : 'Valider'}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setCanEdit((prev) => !prev)}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-stroke/70 bg-white/90 text-primary transition hover:border-primary/50 hover:bg-white dark:border-strokedark dark:bg-boxdark dark:hover:border-primary dark:hover:bg-meta-4/80 dark:text-primary"
+            aria-label="Modification directe"
+          >
+            {canEdit ? LOCK_OPEN : LOCK_CLOSED}
+          </button>
         </div>
       </div>
 
-      <div className="min-h-0 w-full flex-1 overflow-auto">
-        <table className="w-full table-fixed min-w-max">
+      {/* Scroll horizontal si tableau large ; overflow-y-hidden pour éviter une 2e scrollbar verticale (la seule reste collée au tableau) */}
+      <div className="min-w-0 overflow-x-auto overflow-y-hidden">
+        <div className="w-max max-h-[calc(100vh-14rem)] overflow-auto">
+          <div className="min-h-full w-max">
+          <table
+            ref={tableRef}
+            className="min-w-full border-collapse table-fixed"
+            style={{ tableLayout: 'fixed' }}
+            onKeyDown={handleTableKeyDown}
+          >
+          <colgroup>
+            <col className="w-28 min-w-[6.5rem] max-w-[7rem]" />
+            {filteredProducts.flatMap((product) =>
+              filteredHours.map((hour) => (
+                <col key={`${product}-${hour}`} className="w-[5.5rem] min-w-[5.5rem] max-w-[5.5rem]" />
+              ))
+            )}
+          </colgroup>
           <thead>
-            <tr className="text-left" style={{ backgroundColor: '#344256' }}>
-              <th className="sticky top-0 z-20 h-9 w-[10%] min-w-0 border-r border-stroke bg-boxdark-2 py-0 px-2 text-xs font-medium leading-9 text-white dark:border-strokedark xl:pl-4" style={{ backgroundColor: '#344256' }} rowSpan={2}>
-              </th>
-              {currentProducts.map((product, productIndex) => (
+            <tr>
+              <th
+                rowSpan={2}
+                className="sticky left-0 z-20 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 border-t-0 border-l-0 bg-[#eff6ff] py-1.5 pl-2 pr-2 dark:border-strokedark dark:border-t-0 dark:border-l-0 dark:bg-[#273342]"
+                aria-label=""
+              />
+              {filteredProducts.map((product) => (
                 <th
                   key={product}
                   colSpan={filteredHours.length}
-                  className={`sticky top-0 z-20 h-9 min-w-0 py-0 px-2 text-center text-xs font-medium leading-9 text-white dark:border-strokedark ${
-                    productIndex < currentProducts.length - 1 ? 'relative after:content-[""] after:absolute after:right-0 after:top-1 after:bottom-1 after:w-px after:bg-white' : ''
-                  }`}
-                  style={{ backgroundColor: '#344256' }}
+                  className="sticky top-0 z-10 min-w-[5.5rem] border-b border-r border-stroke/70 bg-primary py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark"
                 >
                   {productLabels[product]}
                 </th>
               ))}
             </tr>
-            <tr className="text-left" style={{ backgroundColor: '#344256' }}>
-              {currentProducts.map((product, productIndex) =>
-                filteredHours.map((hour, hourIndex) => (
+            <tr>
+              {filteredProducts.map((product) =>
+                filteredHours.map((hour) => (
                   <th
                     key={`${product}-${hour}`}
-                    className={`sticky top-9 z-10 min-w-0 border-r border-stroke py-1 px-1 text-center text-[10px] font-medium text-black dark:border-strokedark ${
-                      productIndex === currentProducts.length - 1 && hourIndex === filteredHours.length - 1 ? 'border-r-0' : ''
-                    } ${
-                      hourIndex === filteredHours.length - 1 && productIndex < currentProducts.length - 1
-                        ? 'relative after:content-[""] after:absolute after:right-0 after:top-1 after:bottom-1 after:w-px after:bg-white'
-                        : ''
-                    }`}
-                    style={{ backgroundColor: hourColors[hour] }}
+                    className="sticky top-7 z-10 min-w-[5.5rem] w-[5.5rem] border-r border-b border-stroke/70 bg-primary/90 py-1 text-center text-[11px] font-medium text-white/95 dark:border-strokedark"
                   >
                     {hourLabels[hour]}
                   </th>
@@ -406,94 +361,56 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
           </thead>
           <tbody>
             {filteredData.map((row, rowIndex) => {
-              // Find original index for handleChange
               const originalIndex = data.findIndex((r) => r.property === row.property);
               return (
-              <tr key={rowIndex}>
-                <td 
-                  className="min-w-0 overflow-hidden border-b border-r border-stroke bg-gray-300 py-1.5 px-2 pl-3 text-xs dark:border-strokedark xl:pl-4 relative before:content-[''] before:absolute before:bottom-0 before:left-1 before:right-1 before:h-px before:bg-white"
-                  style={isDarkMode ? { backgroundColor: '#344256' } : {}}
+                <tr
+                  key={row.property}
+                  className={`group border-b border-stroke/50 odd:bg-slate-100 even:bg-white transition-colors dark:border-strokedark/70 dark:odd:bg-meta-4/30 dark:even:bg-boxdark ${canEdit ? 'hover:bg-slate-200 dark:hover:bg-meta-4/50' : ''}`}
                 >
-                  <p className="truncate font-medium text-white">{row.property}</p>
-                </td>
-                {currentProducts.map((product, productIndex) =>
-                  filteredHours.map((hour, hourIndex) => {
-                    const value = row[product][hour];
-                    const hasValue = value && value.trim() !== '';
-                    const isLastCell = productIndex === currentProducts.length - 1 && hourIndex === filteredHours.length - 1;
-                    return (
-                      <td
-                        key={`${product}-${hour}`}
-                        className={`min-w-0 border-b border-r border-stroke py-1 px-1 dark:border-strokedark relative before:content-[''] before:absolute before:bottom-0 before:left-1 before:right-1 before:h-px before:bg-white ${
-                          hasValue ? 'bg-gray-100 dark:bg-meta-4' : 'bg-white'
-                        } ${isLastCell ? 'border-r-0' : ''} ${
-                          hourIndex === filteredHours.length - 1 && productIndex < currentProducts.length - 1
-                            ? 'after:content-[""] after:absolute after:right-0 after:top-1 after:bottom-1 after:w-px after:bg-white'
-                            : ''
-                        }`}
-                      >
-                        <input
-                          type="text"
-                          value={value}
-                          onChange={(e) => handleChange(originalIndex, product, hour, e.target.value)}
-                          className="w-full min-w-0 bg-transparent text-right text-xs font-semibold text-black focus:outline-none dark:text-white"
-                          style={{
-                            backgroundColor: 'transparent',
-                          }}
-                        />
-                      </td>
-                    );
-                  })
-                )}
-              </tr>
+                  <td className={`sticky left-0 z-10 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 bg-[#3c50e0] py-1 pl-2 pr-2 text-sm font-medium text-white dark:border-strokedark dark:bg-[#3c50e0] dark:text-white ${canEdit ? 'group-hover:bg-[#3c50e0]/90 dark:group-hover:bg-[#3c50e0]/90' : ''}`}>
+                    <span className="block truncate" title={row.property}>{row.property}</span>
+                  </td>
+                  {filteredProducts.map((product, productIndex) =>
+                    filteredHours.map((hour, hourIndex) => {
+                      const value = row[product][hour];
+                      const savedRow = lastSavedData != null && lastSavedData.length > 0 ? lastSavedData[originalIndex] : null;
+                      const savedValue = savedRow?.[product]?.[hour];
+                      const isModified = savedRow != null && savedValue !== value;
+                      const colIndex = productIndex * filteredHours.length + hourIndex;
+                      return (
+                        <td
+                          key={`${product}-${hour}`}
+                          className={`min-w-[5.5rem] w-[5.5rem] border-r border-stroke/50 py-0 px-1.5 dark:border-strokedark/70 ${isModified ? 'bg-[#24303f] dark:bg-[#f1f5f9]' : 'bg-transparent'}`}
+                        >
+                          <input
+                            type="text"
+                            value={value}
+                            readOnly={!canEdit}
+                            onChange={(e) => handleChange(originalIndex, product, hour, e.target.value)}
+                            data-cell="true"
+                            data-row={rowIndex}
+                            data-col={colIndex}
+                            className={`w-full py-1 pr-2 text-right text-sm font-medium outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 ${
+                              isModified
+                                ? 'bg-[#24303f] text-white placeholder:text-white/50 dark:bg-[#f1f5f9] dark:text-black dark:placeholder:text-black/50'
+                                : 'bg-transparent ' + (canEdit
+                                  ? 'text-slate-800 focus:ring-2 focus:ring-primary/20 dark:text-slate-200'
+                                  : 'cursor-default text-slate-800 dark:text-slate-200')
+                            }`}
+                            placeholder="—"
+                          />
+                        </td>
+                      );
+                    })
+                  )}
+                </tr>
               );
             })}
           </tbody>
         </table>
-      </div>
-
-      {/* Pagination Controls */}
-      {productGroups.length > 1 && (
-        <div className="mt-4 flex shrink-0 items-center justify-center gap-2">
-          <button
-            onClick={() => setCurrentPage(Math.max(0, validPage - 1))}
-            disabled={validPage === 0}
-            className={`rounded px-3 py-1.5 text-xs font-medium transition !text-white ${
-              validPage === 0
-                ? 'cursor-not-allowed bg-gray-200 dark:bg-gray-700'
-                : 'bg-primary hover:bg-primary/90'
-            }`}
-          >
-            Précédent
-          </button>
-          <div className="flex gap-1">
-            {productGroups.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentPage(index)}
-                className={`rounded px-3 py-1.5 text-xs font-medium transition ${
-                  validPage === index
-                    ? 'bg-primary text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                }`}
-              >
-                {index + 1}
-              </button>
-            ))}
           </div>
-          <button
-            onClick={() => setCurrentPage(Math.min(totalPages - 1, validPage + 1))}
-            disabled={validPage === totalPages - 1}
-            className={`rounded px-3 py-1.5 text-xs font-medium transition !text-white ${
-              validPage === totalPages - 1
-                ? 'cursor-not-allowed bg-gray-200 dark:bg-gray-700'
-                : 'bg-primary hover:bg-primary/90'
-            }`}
-          >
-            Suivant
-          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 };

@@ -1,42 +1,70 @@
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import LogoIcon from '../../images/logo/logo-icon.svg';
+import DarkModeSwitcher from '../../components/Header/DarkModeSwitcher';
+import { useAuth } from '../../context/AuthContext';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login, isAuthenticated, loading } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-2 dark:bg-boxdark-2">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    const from = (location.state as { from?: string })?.from ?? '/';
+    return <Navigate to={from} replace />;
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate('/');
+    setError(null);
+    setSubmitting(true);
+    try {
+      await login(email, password);
+      const from = (location.state as { from?: string })?.from ?? '/';
+      navigate(from, { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Connexion impossible');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="dark min-h-screen bg-boxdark-2 flex flex-col items-center justify-center px-4 py-8">
-      {/* Logo */}
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8 bg-gray-2 dark:bg-boxdark-2">
+      {/* Thème + Logo */}
+      <div className="absolute top-4 right-4">
+        <DarkModeSwitcher />
+      </div>
       <Link
         to="/"
-        className="mb-8 flex items-center justify-center"
+        className="mb-8 flex items-center justify-center gap-3"
         aria-label="Retour à l'accueil"
       >
         <img src={LogoIcon} alt="Logo" className="h-12 w-12" />
+        <span className="text-xl font-semibold" style={{ color: '#3c50e0' }}>
+          OpsDigital
+        </span>
       </Link>
 
       {/* Card */}
-      <div className="w-full max-w-md rounded-lg border border-strokedark bg-boxdark shadow-default">
-        <div className="border-b border-strokedark px-6 py-5">
-          <h1 className="text-xl font-semibold text-white">
-            Connexion
-          </h1>
-          <p className="mt-1 text-sm text-bodydark2">
-            Connectez-vous pour accéder à l'application.
-          </p>
-        </div>
-
+      <div className="w-full max-w-md rounded-lg border border-stroke dark:border-strokedark bg-white dark:bg-boxdark shadow-default">
         <form onSubmit={handleSubmit} className="p-6 sm:p-8">
           <div className="mb-5">
             <label
               htmlFor="email"
-              className="mb-2.5 block text-sm font-medium text-white"
+              className="mb-2.5 block text-sm font-medium text-black dark:text-white"
             >
               E-mail
             </label>
@@ -46,7 +74,9 @@ const Login: React.FC = () => {
                 type="email"
                 placeholder="votre@email.com"
                 required
-                className="w-full rounded-lg border border-form-strokedark bg-form-input py-3 pl-4 pr-12 text-white placeholder-bodydark2 outline-none transition focus:border-primary"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded-lg border border-stroke dark:border-form-strokedark bg-gray dark:bg-form-input py-3 pl-4 pr-12 text-black dark:text-white placeholder-bodydark2 outline-none transition focus:border-primary"
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-bodydark2">
                 <svg
@@ -68,10 +98,16 @@ const Login: React.FC = () => {
             </div>
           </div>
 
+          {error && (
+            <div className="mb-4 rounded-lg border border-danger/30 bg-danger/10 py-2.5 px-4 text-sm text-danger">
+              {error}
+            </div>
+          )}
+
           <div className="mb-6">
             <label
               htmlFor="password"
-              className="mb-2.5 block text-sm font-medium text-white"
+              className="mb-2.5 block text-sm font-medium text-black dark:text-white"
             >
               Mot de passe
             </label>
@@ -81,7 +117,9 @@ const Login: React.FC = () => {
                 type="password"
                 placeholder="••••••••"
                 required
-                className="w-full rounded-lg border border-form-strokedark bg-form-input py-3 pl-4 pr-12 text-white placeholder-bodydark2 outline-none transition focus:border-primary"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-lg border border-stroke dark:border-form-strokedark bg-gray dark:bg-form-input py-3 pl-4 pr-12 text-black dark:text-white placeholder-bodydark2 outline-none transition focus:border-primary"
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-bodydark2">
                 <svg
@@ -109,18 +147,13 @@ const Login: React.FC = () => {
 
           <button
             type="submit"
-            className="w-full rounded-lg border border-primary bg-primary py-3.5 font-medium text-white transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-boxdark"
+            disabled={submitting}
+            className="w-full rounded-lg border border-primary bg-primary py-3.5 font-medium text-white transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white disabled:opacity-70 dark:focus:ring-offset-boxdark"
           >
-            Se connecter
+            {submitting ? 'Connexion…' : 'Se connecter'}
           </button>
         </form>
       </div>
-
-      <p className="mt-6 text-center text-xs text-bodydark2">
-        <Link to="/" className="hover:text-white">
-          Retour à l'accueil
-        </Link>
-      </p>
     </div>
   );
 };

@@ -103,6 +103,11 @@ const options: ApexOptions = {
     axisTicks: {
       show: false,
     },
+    crosshairs: {
+      show: true,
+      position: 'back',
+      stroke: { width: 1, color: '#b1b9c4' },
+    },
   },
   yaxis: {
     title: {

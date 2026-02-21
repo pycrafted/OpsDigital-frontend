@@ -1,156 +1,83 @@
 import React from 'react';
+import {
+  ATM_MEROX_CATEGORIES as categories,
+  ATM_MEROX_HOURS,
+  createInitialAtmMeroxData,
+  getValueKey,
+  type HourRow,
+} from '../../data/atmMeroxPreFlash';
 
-interface CategoryData {
-  category: string;
-  subRows: string[];
-}
-
-const categories: CategoryData[] = [
-  {
-    category: 'Charge brut',
-    subRows: ['Pres° Entrée UNITE', '17 FT 001 Débit charge'],
-  },
-  {
-    category: "I° Train Brut",
-    subRows: ['10 PC 022 Préssion D120', '10 TI 062 T° Entrée D120'],
-  },
-  {
-    category: 'D120',
-    subRows: ['10 KDI 029 Niv Eau D120'],
-  },
-  {
-    category: 'FOUR F171',
-    subRows: ['17 TC 025 Transfert F 171', '17 TT 631 T° FUMEE F 171'],
-  },
-  {
-    category: 'FOUR F141',
-    subRows: ['10 TI 055 T° Fumée HAUTRAD F 141', '10 TI 040 T° Transf F 141'],
-  },
-  {
-    category: 'FOUR F 101',
-    subRows: [
-      '10 TI 086 T° Entrée Brut F 101',
-      '10 TI 001 T° Transf F101',
-      '10 FI 002 Fumée Rad F101',
-      '10 FI 027 A passe A',
-      '10 FI 027 B passe B',
-      '10 FI 027 C passe C',
-      '10 FI 027 D passe D',
-    ],
-  },
-  {
-    category: 'C101',
-    subRows: [
-      '10 PI 001 press Tete C101',
-      '10 FI 002 Temp Tete C101',
-      'Amime Neut --> C101',
-      'Amime Film --> C101',
-      'PH EAU D 102',
-    ],
-  },
-  {
-    category: 'C105',
-    subRows: ['10 PI 002 Press C105', 'Amime Film --> C105'],
-  },
-  {
-    category: 'C 106',
-    subRows: ['10 PI 053 Press C106'],
-  },
-  {
-    category: 'C114',
-    subRows: ['PH EAU D 141'],
-  },
-  {
-    category: 'C141',
-    subRows: [
-      '10 PI 008 Vide Z Flash',
-      'Amime Neut --> C141',
-      'Amime Film --> C141',
-    ],
-  },
-  {
-    category: 'C171',
-    subRows: [
-      'Amime Film --> C171',
-      'Amime Neut --> C171',
-      '17 PC 022 Press Tete C171',
-      '17 TC 017 Temp Tete C171',
-      'PH EAU D 171',
-    ],
-  },
-  {
-    category: 'MEROX',
-    subRows: [
-      '80 PI 006 Press Sortie MEROX',
-      '% Pompe Sode 3°B',
-      '80 FI 002 DEBIT CHRGE MEROX',
-    ],
-  },
-  {
-    category: 'DOPE',
-    subRows: ['Injection Dope GO', 'Injection Dope FO'],
-  },
-  {
-    category: '',
-    subRows: ['DEBIT H20 G122'],
-  },
-];
-
-// 3 tableaux : flux procédé + équilibre des sous-colonnes (~9, ~16, ~14)
-const TABLE_GROUPS: string[][] = [
-  // Tableau 1 — Entrée, D120 & Fours 171/141
-  ['Charge brut', "I° Train Brut", 'D120', 'FOUR F171', 'FOUR F141'],
-  // Tableau 2 — Four 101 & Colonnes 101 à 114
-  ['FOUR F 101', 'C101', 'C105', 'C 106', 'C114'],
-  // Tableau 3 — Colonnes 141/171, MEROX, DOPE & Débit
-  ['C141', 'C171', 'MEROX', 'DOPE', ''],
-];
-
-const hours = ['7h', '11h', '15h', '19h', '23h', '3h'] as const;
-type HourKey = (typeof hours)[number];
-
+const hours = [...ATM_MEROX_HOURS];
 const allCategoryNames = categories.map((c) => c.category);
 const allSubRowNames = [...new Set(categories.flatMap((c) => c.subRows))] as string[];
 
-interface HourRow {
-  hour: HourKey;
-  values: Record<string, string>; // key: "category_subRow"
+const CHEVRON_DOWN = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden>
+    <path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" />
+  </svg>
+);
+
+const CHECK = (
+  <svg className="h-4 w-4 shrink-0 text-primary" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+  </svg>
+);
+
+const LOCK_CLOSED = (
+  <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+  </svg>
+);
+
+const LOCK_OPEN = (
+  <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+    <path fillRule="evenodd" d="M14.5 1A4.5 4.5 0 0010 5.5V9H3a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-1V5.5A4.5 4.5 0 0014.5 1zM12 9V5.5a2 2 0 10-4 0V9h4z" clipRule="evenodd" />
+  </svg>
+);
+
+const VALIDATE_ICON = (
+  <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+  </svg>
+);
+
+export interface TableAtmMeroxPreFlashProps {
+  data: HourRow[];
+  onDataChange: (data: HourRow[]) => void;
+  selectedDate: string;
+  onDateChange: (date: string) => void;
+  loading?: boolean;
+  onValidate?: () => void;
+  saving?: boolean;
+  showValidateButton?: boolean;
+  lastSavedData?: HourRow[] | null;
 }
 
-const getValueKey = (category: string, subRow: string) =>
-  `${category || '__empty__'}_${subRow}`;
-
-const createInitialData = (): HourRow[] => {
-  return hours.map((hour) => {
-    const values: Record<string, string> = {};
-    categories.forEach((cat) => {
-      cat.subRows.forEach((subRow) => {
-        values[getValueKey(cat.category, subRow)] = '';
-      });
-    });
-    return { hour, values };
-  });
-};
-
-const subRowColors = ['#fff2db', '#e1f8f0', '#feeaea', '#e8f4f8', '#f0e8ff', '#fff8e1'];
-
-const CATEGORIES_PER_PAGE = 5;
-
-const TableAtmMeroxPreFlash = () => {
-  const [data, setData] = React.useState<HourRow[]>(createInitialData());
-  const [currentPage, setCurrentPage] = React.useState(0);
+const TableAtmMeroxPreFlash = ({
+  data,
+  onDataChange,
+  selectedDate,
+  onDateChange,
+  loading = false,
+  onValidate,
+  saving = false,
+  showValidateButton = false,
+  lastSavedData = null,
+}: TableAtmMeroxPreFlashProps) => {
   const [selectedHours, setSelectedHours] = React.useState<string[]>([...hours]);
   const [selectedCategories, setSelectedCategories] = React.useState<string[]>([...allCategoryNames]);
   const [selectedSubRows, setSelectedSubRows] = React.useState<string[]>([...allSubRowNames]);
+  const [canEdit, setCanEdit] = React.useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = React.useState(false);
   const [showHourDropdown, setShowHourDropdown] = React.useState(false);
   const [showSubRowDropdown, setShowSubRowDropdown] = React.useState(false);
   const categoryDropdownRef = React.useRef<HTMLDivElement>(null);
-  const categoryTriggerRef = React.useRef<HTMLDivElement>(null);
+  const categoryTriggerRef = React.useRef<HTMLButtonElement>(null);
   const hourDropdownRef = React.useRef<HTMLDivElement>(null);
-  const hourTriggerRef = React.useRef<HTMLDivElement>(null);
+  const hourTriggerRef = React.useRef<HTMLButtonElement>(null);
   const subRowDropdownRef = React.useRef<HTMLDivElement>(null);
-  const subRowTriggerRef = React.useRef<HTMLDivElement>(null);
+  const subRowTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const tableRef = React.useRef<HTMLTableElement>(null);
 
   const handleHourToggle = (hour: string) => {
     setSelectedHours((prev) =>
@@ -197,25 +124,63 @@ const TableAtmMeroxPreFlash = () => {
   });
 
   const filteredData = data.filter((row) => selectedHours.includes(row.hour));
-  const filteredCategoryNames = allCategoryNames.filter((c) => selectedCategories.includes(c));
-  const categoryGroups: string[][] = [];
-  for (let i = 0; i < filteredCategoryNames.length; i += CATEGORIES_PER_PAGE) {
-    categoryGroups.push(filteredCategoryNames.slice(i, i + CATEGORIES_PER_PAGE));
-  }
-  const totalPages = Math.max(1, categoryGroups.length);
-  const validPage = Math.min(Math.max(0, currentPage), totalPages - 1);
-  const currentGroupCategories = categoryGroups[validPage] || [];
   const currentCategories = categories
-    .filter((cat) => currentGroupCategories.includes(cat.category))
+    .filter((cat) => selectedCategories.includes(cat.category))
     .map((cat) => ({
       ...cat,
       subRows: cat.subRows.filter((sub) => selectedSubRows.includes(sub)),
     }))
     .filter((cat) => cat.subRows.length > 0);
 
-  React.useEffect(() => {
-    if (currentPage >= totalPages) setCurrentPage(0);
-  }, [totalPages, currentPage]);
+  const totalRows = filteredData.length;
+  const totalCols = currentCategories.reduce((s, cat) => s + cat.subRows.length, 0);
+
+  const handleTableKeyDown = (e: React.KeyboardEvent<HTMLTableElement>) => {
+    if (!canEdit) return;
+    const target = e.target as HTMLElement;
+    if (target.tagName !== 'INPUT' || target.getAttribute('data-cell') !== 'true') return;
+    const row = target.getAttribute('data-row');
+    const col = target.getAttribute('data-col');
+    if (row === null || col === null) return;
+    const rowIndex = parseInt(row, 10);
+    const colIndex = parseInt(col, 10);
+    if (Number.isNaN(rowIndex) || Number.isNaN(colIndex)) return;
+    let nextRow = rowIndex;
+    let nextCol = colIndex;
+    switch (e.key) {
+      case 'ArrowLeft':
+        if (colIndex > 0) nextCol = colIndex - 1;
+        else return;
+        break;
+      case 'ArrowRight':
+        if (colIndex < totalCols - 1) nextCol = colIndex + 1;
+        else return;
+        break;
+      case 'ArrowUp':
+        if (rowIndex > 0) nextRow = rowIndex - 1;
+        else return;
+        break;
+      case 'ArrowDown':
+        if (rowIndex < totalRows - 1) nextRow = rowIndex + 1;
+        else return;
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    const nextInput = tableRef.current?.querySelector<HTMLInputElement>(
+      `input[data-cell="true"][data-row="${nextRow}"][data-col="${nextCol}"]`
+    );
+    if (nextInput) {
+      nextInput.focus();
+    }
+  };
+
+  const filterTriggerClass =
+    'flex cursor-pointer items-center gap-2 rounded-xl border border-stroke/70 bg-white/90 px-4 py-2.5 text-sm font-medium text-[#3c50e0] shadow-sm transition hover:border-primary/50 hover:bg-white hover:text-primary dark:border-strokedark dark:bg-boxdark dark:text-white dark:hover:border-primary dark:hover:bg-meta-4/80 dark:hover:text-white';
+  const dropdownPanelClass =
+    'absolute left-0 top-full z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark';
 
   const handleChange = (hourIndex: number, category: string, subRow: string, value: string) => {
     const key = getValueKey(category, subRow);
@@ -224,323 +189,227 @@ const TableAtmMeroxPreFlash = () => {
       ...newData[hourIndex],
       values: { ...newData[hourIndex].values, [key]: value },
     };
-    setData(newData);
+    onDataChange(newData);
   };
 
   return (
-    <div className="rounded-sm border-0 bg-whiten px-5 pt-6 pb-2.5 dark:bg-boxdark-2 sm:px-7.5 xl:pb-1">
-      {/* Filter Section */}
-      <div className="mb-4 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-        {/* Filtrer par catégorie */}
-        <div className="w-full sm:w-64">
-          <label className="mb-1 block text-xs text-black dark:text-white">
-            Filtrer par catégorie
-          </label>
-          <div className="relative z-20" ref={categoryDropdownRef}>
-            <div
-              ref={categoryTriggerRef}
-              onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-              className="cursor-pointer"
-            >
-              <div className="mb-1 flex rounded border border-stroke bg-white py-1 pl-2 pr-2 dark:border-form-strokedark dark:bg-white">
-                <div className="flex-1">
-                  <input
-                    placeholder={
-                      selectedCategories.length > 0
-                        ? `${selectedCategories.length} catégorie(s) sélectionnée(s)`
-                        : 'Sélectionner des catégories'
-                    }
-                    className="h-full w-full appearance-none bg-transparent p-0.5 px-1 text-xs outline-none text-black dark:text-white"
-                    readOnly
-                  />
-                </div>
-                <div className="flex w-6 items-center">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="opacity-80">
-                    <path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="#637381" />
-                  </svg>
-                </div>
-              </div>
-            </div>
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-6">
+      {loading && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-white/80 dark:bg-boxdark/80">
+          <p className="text-sm font-medium text-bodydark2">Chargement…</p>
+        </div>
+      )}
+      {/* Barre de filtres (centrés) + bouton cadenas à droite */}
+      <div className="flex w-full flex-shrink-0 items-center gap-2">
+        <div className="flex-1" />
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {/* Catégories */}
+          <div className="relative" ref={categoryDropdownRef}>
+            <button type="button" ref={categoryTriggerRef} onClick={() => setShowCategoryDropdown(!showCategoryDropdown)} className={filterTriggerClass}>
+              Catégories
+              <span className={showCategoryDropdown ? 'rotate-180' : ''}>{CHEVRON_DOWN}</span>
+            </button>
             {showCategoryDropdown && (
-              <div className="absolute left-0 top-full z-40 max-h-60 w-full overflow-y-auto rounded bg-white shadow dark:bg-form-input">
+              <div className={`${dropdownPanelClass} min-w-[14rem]`}>
                 {allCategoryNames.map((cat) => {
                   const isSelected = selectedCategories.includes(cat);
                   return (
-                    <div
+                    <button
                       key={cat || '__empty__'}
-                      className={`cursor-pointer border-b border-stroke p-1.5 pl-2 text-xs hover:bg-primary/5 dark:border-form-strokedark ${
-                        isSelected ? 'bg-primary/10 dark:bg-primary/20' : ''
-                      }`}
+                      type="button"
                       onClick={() => handleCategoryToggle(cat)}
+                      className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${
+                        isSelected ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'
+                      }`}
                     >
-                      {isSelected && (
-                        <svg className="mr-1.5 inline h-3 w-3 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                      <span className={isSelected ? 'font-semibold text-primary dark:text-white' : 'text-black dark:text-white'}>
-                        {cat || '—'}
-                      </span>
-                    </div>
+                      {isSelected && CHECK}
+                      <span className={isSelected ? 'font-medium' : ''}>{cat || '—'}</span>
+                    </button>
                   );
                 })}
               </div>
             )}
           </div>
-        </div>
 
-        {/* Filtrer par heure */}
-        <div className="w-full sm:w-64">
-          <label className="mb-1 block text-xs text-black dark:text-white">
-            Filtrer par heure
-          </label>
-          <div className="relative z-20" ref={hourDropdownRef}>
-            <div
-              ref={hourTriggerRef}
-              onClick={() => setShowHourDropdown(!showHourDropdown)}
-              className="cursor-pointer"
-            >
-              <div className="mb-1 flex rounded border border-stroke bg-white py-1 pl-2 pr-2 dark:border-form-strokedark dark:bg-white">
-                <div className="flex-1">
-                  <input
-                    placeholder={
-                      selectedHours.length > 0
-                        ? `${selectedHours.length} heure(s) sélectionnée(s)`
-                        : 'Sélectionner des heures'
-                    }
-                    className="h-full w-full appearance-none bg-transparent p-0.5 px-1 text-xs outline-none text-black dark:text-white"
-                    readOnly
-                  />
-                </div>
-                <div className="flex w-6 items-center">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="opacity-80">
-                    <path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="#637381" />
-                  </svg>
-                </div>
-              </div>
-            </div>
+          {/* Créneaux */}
+          <div className="relative" ref={hourDropdownRef}>
+            <button type="button" ref={hourTriggerRef} onClick={() => setShowHourDropdown(!showHourDropdown)} className={filterTriggerClass}>
+              Créneaux
+              <span className={showHourDropdown ? 'rotate-180' : ''}>{CHEVRON_DOWN}</span>
+            </button>
             {showHourDropdown && (
-              <div className="absolute left-0 top-full z-40 max-h-60 w-full overflow-y-auto rounded bg-white shadow dark:bg-form-input">
+              <div className={`${dropdownPanelClass} min-w-[10rem]`}>
                 {hours.map((hour) => {
                   const isSelected = selectedHours.includes(hour);
                   return (
-                    <div
+                    <button
                       key={hour}
-                      className={`cursor-pointer border-b border-stroke p-1.5 pl-2 text-xs hover:bg-primary/5 dark:border-form-strokedark ${
-                        isSelected ? 'bg-primary/10 dark:bg-primary/20' : ''
-                      }`}
+                      type="button"
                       onClick={() => handleHourToggle(hour)}
+                      className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${
+                        isSelected ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'
+                      }`}
                     >
-                      {isSelected && (
-                        <svg className="mr-1.5 inline h-3 w-3 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                      <span className={isSelected ? 'font-semibold text-primary dark:text-white' : 'text-black dark:text-white'}>
-                        {hour}
-                      </span>
-                    </div>
+                      {isSelected && CHECK}
+                      {hour}
+                    </button>
                   );
                 })}
               </div>
             )}
           </div>
-        </div>
 
-        {/* Filtrer par ligne */}
-        <div className="w-full sm:w-64">
-          <label className="mb-1 block text-xs text-black dark:text-white">
-            Filtrer par ligne
-          </label>
-          <div className="relative z-20" ref={subRowDropdownRef}>
-            <div
-              ref={subRowTriggerRef}
-              onClick={() => setShowSubRowDropdown(!showSubRowDropdown)}
-              className="cursor-pointer"
-            >
-              <div className="mb-1 flex rounded border border-stroke bg-white py-1 pl-2 pr-2 dark:border-form-strokedark dark:bg-white">
-                <div className="flex-1">
-                  <input
-                    placeholder={
-                      selectedSubRows.length > 0
-                        ? `${selectedSubRows.length} ligne(s) sélectionnée(s)`
-                        : 'Sélectionner des lignes'
-                    }
-                    className="h-full w-full appearance-none bg-transparent p-0.5 px-1 text-xs outline-none text-black dark:text-white"
-                    readOnly
-                  />
-                </div>
-                <div className="flex w-6 items-center">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="opacity-80">
-                    <path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="#637381" />
-                  </svg>
-                </div>
-              </div>
-            </div>
+          {/* Indicateurs */}
+          <div className="relative" ref={subRowDropdownRef}>
+            <button type="button" ref={subRowTriggerRef} onClick={() => setShowSubRowDropdown(!showSubRowDropdown)} className={filterTriggerClass}>
+              Indicateurs
+              <span className={showSubRowDropdown ? 'rotate-180' : ''}>{CHEVRON_DOWN}</span>
+            </button>
             {showSubRowDropdown && (
-              <div className="absolute left-0 top-full z-40 max-h-60 w-full overflow-y-auto rounded bg-white shadow dark:bg-form-input">
+              <div className={`${dropdownPanelClass} min-w-[18rem] max-h-72`}>
                 {allSubRowNames.map((sub) => {
                   const isSelected = selectedSubRows.includes(sub);
                   return (
-                    <div
+                    <button
                       key={sub}
-                      className={`cursor-pointer border-b border-stroke p-1.5 pl-2 text-xs hover:bg-primary/5 dark:border-form-strokedark ${
-                        isSelected ? 'bg-primary/10 dark:bg-primary/20' : ''
-                      }`}
+                      type="button"
                       onClick={() => handleSubRowToggle(sub)}
+                      className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${
+                        isSelected ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'
+                      }`}
                     >
-                      {isSelected && (
-                        <svg className="mr-1.5 inline h-3 w-3 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                      <span className={isSelected ? 'font-semibold text-primary dark:text-white' : 'text-black dark:text-white'}>
-                        {sub}
-                      </span>
-                    </div>
+                      {isSelected && CHECK}
+                      <span className={isSelected ? 'font-medium' : ''}>{sub}</span>
+                    </button>
                   );
                 })}
               </div>
             )}
           </div>
         </div>
-      </div>
-
-      <div className="w-full overflow-x-auto overflow-y-auto" style={{ maxHeight: '70vh' }}>
-        <table className="w-full table-fixed">
-          <thead>
-            <tr className="text-left" style={{ backgroundColor: '#344256' }}>
-              <th
-                className="w-[10%] min-w-0 bg-whiten py-2 px-2 text-xs font-medium text-black dark:bg-boxdark-2 dark:text-white xl:pl-4"
-                rowSpan={2}
-              >
-                {''}
-              </th>
-              {currentCategories.map((cat, catIndex) => (
-                <th
-                  key={cat.category || '__empty__'}
-                  colSpan={cat.subRows.length}
-                  className={`min-w-0 py-2 px-2 text-center text-xs font-medium text-white dark:border-strokedark ${
-                    catIndex < currentCategories.length - 1 ? 'relative after:content-[""] after:absolute after:right-0 after:top-1 after:bottom-1 after:w-px after:bg-white' : ''
-                  }`}
-                  style={{ backgroundColor: '#344256' }}
-                >
-                  {cat.category || '—'}
-                </th>
-              ))}
-            </tr>
-            <tr className="text-left" style={{ backgroundColor: '#344256' }}>
-              {currentCategories.flatMap((cat, catIndex) =>
-                cat.subRows.map((subRow, subIndex) => {
-                  const isLastSubRowOfCategory = subIndex === cat.subRows.length - 1 && catIndex < currentCategories.length - 1;
-                  return (
-                    <th
-                      key={getValueKey(cat.category, subRow)}
-                      className={`min-w-0 py-1.5 px-2 text-center text-[10px] font-medium text-black dark:border-strokedark ${
-                        isLastSubRowOfCategory ? 'relative after:content-[""] after:absolute after:right-0 after:top-1 after:bottom-1 after:w-px after:bg-white' : ''
-                      }`}
-                      style={{
-                        backgroundColor: subRowColors[subIndex % subRowColors.length],
-                        borderRight: '1px solid black',
-                      }}
-                    >
-                      {subRow}
-                    </th>
-                  );
-                })
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {filteredData.map((hourRow) => {
-              const hourIndex = data.findIndex((r) => r.hour === hourRow.hour);
-              return (
-                <tr key={hourRow.hour}>
-                  <td
-                    className="min-w-0 overflow-hidden border-b border-r border-[#eee] py-1.5 px-2 pl-3 text-xs dark:border-strokedark xl:pl-4"
-                    style={{ backgroundColor: '#d1d5db' }}
-                  >
-                    <p className="truncate font-medium text-black">{hourRow.hour}</p>
-                  </td>
-                  {currentCategories.flatMap((cat, catIndex) =>
-                    cat.subRows.map((subRow, subIndex) => {
-                      const key = getValueKey(cat.category, subRow);
-                      const value = hourRow.values[key] || '';
-                      const hasValue = value.trim() !== '';
-                      const isLastSubRowOfCategory = subIndex === cat.subRows.length - 1 && catIndex < currentCategories.length - 1;
-                      return (
-                        <td
-                          key={key}
-                          className={`min-w-0 border-b border-r border-[#eee] py-1 px-1 dark:border-strokedark ${
-                            hasValue ? 'bg-gray-100 dark:bg-meta-4' : 'bg-white'
-                          } ${
-                            isLastSubRowOfCategory ? 'relative after:content-[""] after:absolute after:right-0 after:top-1 after:bottom-1 after:w-px after:bg-white' : ''
-                          }`}
-                        >
-                          <input
-                            type="text"
-                            value={value}
-                            onChange={(e) =>
-                              handleChange(hourIndex, cat.category, subRow, e.target.value)
-                            }
-                            className="w-full min-w-0 bg-transparent text-right text-xs font-semibold text-black focus:outline-none dark:text-white"
-                          />
-                        </td>
-                      );
-                    })
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+        <div className="flex flex-1 justify-end items-center gap-2">
+          {showValidateButton && (
+            <button
+              type="button"
+              onClick={() => onValidate?.()}
+              disabled={saving}
+              className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-stroke/70 bg-white/90 px-3 text-green-600 transition hover:border-green-500 hover:bg-white hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-strokedark dark:bg-boxdark dark:text-green-400 dark:hover:border-green-500 dark:hover:bg-meta-4/80 dark:hover:text-green-300"
+              aria-label="Valider et sauvegarder les modifications"
+            >
+              {VALIDATE_ICON}
+              <span className="text-sm font-medium text-inherit">{saving ? 'Sauvegarde…' : 'Valider'}</span>
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
-            disabled={validPage === 0}
-            className={`rounded px-3 py-1.5 text-xs font-medium transition !text-white ${
-              validPage === 0
-                ? 'cursor-not-allowed bg-gray-200 dark:bg-gray-700'
-                : 'bg-primary hover:bg-primary/90'
-            }`}
+            onClick={() => setCanEdit((prev) => !prev)}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-stroke/70 bg-white/90 text-primary transition hover:border-primary/50 hover:bg-white dark:border-strokedark dark:bg-boxdark dark:hover:border-primary dark:hover:bg-meta-4/80 dark:text-primary"
+            aria-label="Modification directe"
           >
-            Précédent
-          </button>
-          <div className="flex gap-1">
-            {categoryGroups.map((_, index) => (
-              <button
-                key={index}
-                type="button"
-                onClick={() => setCurrentPage(index)}
-                className={`rounded px-3 py-1.5 text-xs font-medium transition ${
-                  validPage === index
-                    ? 'bg-primary text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                }`}
-              >
-                {index + 1}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
-            disabled={validPage === totalPages - 1}
-            className={`rounded px-3 py-1.5 text-xs font-medium transition !text-white ${
-              validPage === totalPages - 1
-                ? 'cursor-not-allowed bg-gray-200 dark:bg-gray-700'
-                : 'bg-primary hover:bg-primary/90'
-            }`}
-          >
-            Suivant
+            {canEdit ? LOCK_OPEN : LOCK_CLOSED}
           </button>
         </div>
-      )}
+      </div>
+
+      {/* Tableau — même design que les autres tableaux */}
+      <div className="min-w-0 max-h-[calc(100vh-14rem)] overflow-auto">
+        <div className="min-h-full w-max">
+          <table
+            ref={tableRef}
+            className="min-w-full table-fixed border-collapse"
+            style={{ tableLayout: 'fixed' }}
+            onKeyDown={handleTableKeyDown}
+          >
+            <colgroup>
+              <col className="w-28 min-w-[6.5rem] max-w-[7rem]" />
+              {currentCategories.flatMap((cat) =>
+                cat.subRows.map((subRow) => (
+                  <col key={getValueKey(cat.category, subRow)} className="w-[7rem] min-w-[7rem] max-w-[7rem]" />
+                ))
+              )}
+            </colgroup>
+            <thead>
+              <tr>
+                <th
+                  rowSpan={2}
+                  className="sticky left-0 z-20 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 border-t-0 border-l-0 bg-[#eff6ff] py-1.5 pl-2 pr-2 dark:border-strokedark dark:border-t-0 dark:border-l-0 dark:bg-[#273342]"
+                  aria-label=""
+                />
+                {currentCategories.map((cat) => (
+                  <th
+                    key={cat.category || '__empty__'}
+                    colSpan={cat.subRows.length}
+                    className="sticky top-0 z-10 min-w-0 border-b border-r border-stroke/70 bg-primary py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark"
+                  >
+                    {cat.category || '—'}
+                  </th>
+                ))}
+              </tr>
+              <tr>
+                {currentCategories.flatMap((cat) =>
+                  cat.subRows.map((subRow) => (
+                    <th
+                      key={getValueKey(cat.category, subRow)}
+                      className="sticky top-7 z-10 w-[7rem] min-w-[7rem] max-w-[7rem] border-r border-b border-stroke/70 bg-primary/90 py-1 px-1 text-center text-[11px] font-medium text-white/95 dark:border-strokedark"
+                    >
+                      <span className="block truncate" title={subRow}>{subRow}</span>
+                    </th>
+                  ))
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {filteredData.map((hourRow, rowIndex) => {
+                const hourIndex = data.findIndex((r) => r.hour === hourRow.hour);
+                return (
+                  <tr
+                    key={hourRow.hour}
+                    className={`group border-b border-stroke/50 odd:bg-slate-100 even:bg-white transition-colors dark:border-strokedark/70 dark:odd:bg-meta-4/30 dark:even:bg-boxdark ${canEdit ? 'hover:bg-slate-200 dark:hover:bg-meta-4/50' : ''}`}
+                  >
+                    <td className={`sticky left-0 z-10 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 bg-[#3c50e0] py-1 pl-2 pr-2 text-sm font-medium text-white dark:border-strokedark dark:bg-[#3c50e0] dark:text-white ${canEdit ? 'group-hover:bg-[#3c50e0]/90 dark:group-hover:bg-[#3c50e0]/90' : ''}`}>
+                      <span className="block truncate" title={hourRow.hour}>{hourRow.hour}</span>
+                    </td>
+                    {currentCategories.flatMap((cat, catIndex) =>
+                      cat.subRows.map((subRow, subIndex) => {
+                        const colIndex = currentCategories.slice(0, catIndex).reduce((s, c) => s + c.subRows.length, 0) + subIndex;
+                        const key = getValueKey(cat.category, subRow);
+                        const value = hourRow.values[key] || '';
+                        const savedHourRow = lastSavedData != null && lastSavedData.length > 0 ? lastSavedData[hourIndex] : null;
+                        const savedValue = savedHourRow?.values?.[key];
+                        const isModified = savedHourRow != null && savedValue !== value;
+                        return (
+                          <td
+                            key={key}
+                            className={`w-[7rem] min-w-[7rem] max-w-[7rem] border-r border-stroke/50 py-0 px-1 dark:border-strokedark/70 ${isModified ? 'bg-[#24303f] dark:bg-[#f1f5f9]' : 'bg-transparent'}`}
+                          >
+                            <input
+                              type="text"
+                              value={value}
+                              readOnly={!canEdit}
+                              onChange={(e) => handleChange(hourIndex, cat.category, subRow, e.target.value)}
+                              data-cell="true"
+                              data-row={rowIndex}
+                              data-col={colIndex}
+                              className={`w-full py-1 pr-2 text-right text-sm font-medium outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 ${
+                                isModified
+                                  ? 'bg-[#24303f] text-white placeholder:text-white/50 dark:bg-[#f1f5f9] dark:text-black dark:placeholder:text-black/50'
+                                  : 'bg-transparent ' + (canEdit
+                                    ? 'text-slate-800 focus:ring-2 focus:ring-primary/20 dark:text-slate-200'
+                                    : 'cursor-default text-slate-800 dark:text-slate-200')
+                              }`}
+                              placeholder="—"
+                            />
+                          </td>
+                        );
+                      })
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 };

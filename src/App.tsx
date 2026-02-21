@@ -1,21 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 import Loader from './common/Loader';
 import PageTitle from './components/PageTitle';
+import ProtectedRoute from './components/ProtectedRoute';
 import SignUp from './pages/Authentication/SignUp';
 import Login from './pages/Authentication/Login';
 import Calendar from './pages/Calendar';
 import ECommerce from './pages/Dashboard/ECommerce';
 import Settings from './pages/Settings';
 import AnalysesLaboratoire from './pages/AnalysesLaboratoire';
-import ReformateurCatalytique from './pages/ReformateurCatalytique';
-import CompresseurK245 from './pages/CompresseurK245';
-import CompresseurK244 from './pages/CompresseurK244';
-import AtmMeroxPreFlash from './pages/AtmMeroxPreFlash';
-import ProductionValeurElectricite from './pages/ProductionValeurElectricite';
-import MouvementDesBacs from './pages/MouvementDesBacs';
+import AnalysesLaboratoireGraphique from './pages/AnalysesLaboratoireGraphique';
 import Saisie from './pages/Saisie';
+import SaisieFeuillePage from './pages/SaisieFeuillePage';
 import Profile from './pages/Profile';
 import DefaultLayout from './layout/DefaultLayout';
 
@@ -40,7 +37,7 @@ function App() {
         path="/login"
         element={
           <>
-            <PageTitle title="Connexion | OpsDigital" />
+            <PageTitle />
             <Login />
           </>
         }
@@ -49,7 +46,7 @@ function App() {
         path="/auth/signin"
         element={
           <>
-            <PageTitle title="Connexion | OpsDigital" />
+            <PageTitle />
             <Login />
           </>
         }
@@ -58,111 +55,118 @@ function App() {
         path="/auth/signup"
         element={
           <>
-            <PageTitle title="Inscription | OpsDigital - Tailwind CSS Admin Dashboard Template" />
+            <PageTitle />
             <SignUp />
           </>
         }
       />
-      {/* Pages avec layout (navbar, etc.) */}
+      {/* Pages protégées : connexion requise */}
       <Route path="/*" element={
-        <DefaultLayout>
-          <Routes>
+        <ProtectedRoute>
+          <DefaultLayout>
+            <Routes>
         <Route
           index
           element={
             <>
-              <PageTitle title="Saisie | OpsDigital - Tailwind CSS Admin Dashboard Template" />
-              <Saisie />
-            </>
-          }
-        />
-        <Route
-          path="/tableau-de-bord"
-          element={
-            <>
-              <PageTitle title="Tableau de bord | OpsDigital - Tailwind CSS Admin Dashboard Template" />
+              <PageTitle />
               <ECommerce />
             </>
           }
         />
+        <Route path="/tableau-de-bord" element={<Navigate to="/" replace />} />
         <Route
           path="/calendar"
           element={
             <>
-              <PageTitle title="Calendar | OpsDigital - Tailwind CSS Admin Dashboard Template" />
+              <PageTitle />
               <Calendar />
             </>
           }
         />
+        <Route path="/saisie" element={<Navigate to="/saisie/reformateur-catalytique" replace />} />
         <Route
-          path="/saisie"
-          element={
-            <>
-              <PageTitle title="Saisie | OpsDigital - Tailwind CSS Admin Dashboard Template" />
-              <Saisie />
-            </>
-          }
+          path="/saisie/:feuilleId"
+          element={<SaisieFeuillePage />}
         />
         <Route
-          path="/analyses-laboratoire"
+          path="/tableaux"
           element={
             <>
-              <PageTitle title="Analyses du laboratoire | OpsDigital - Tailwind CSS Admin Dashboard Template" />
+              <PageTitle />
               <AnalysesLaboratoire />
             </>
           }
         />
         <Route
-          path="/reformateur-catalytique"
+          path="/graphique"
           element={
             <>
-              <PageTitle title="Réformateur catalytique | OpsDigital - Tailwind CSS Admin Dashboard Template" />
-              <ReformateurCatalytique />
+              <PageTitle />
+              <AnalysesLaboratoireGraphique />
             </>
           }
         />
         <Route
-          path="/compresseur-k245"
+          path="/graphique/reformateur-catalytique"
           element={
             <>
-              <PageTitle title="Compresseur K 245 | OpsDigital - Tailwind CSS Admin Dashboard Template" />
-              <CompresseurK245 />
+              <PageTitle />
+              <AnalysesLaboratoireGraphique />
             </>
           }
         />
         <Route
-          path="/compresseur-k244"
+          path="/graphique/production"
           element={
             <>
-              <PageTitle title="Compresseur K 244 | OpsDigital - Tailwind CSS Admin Dashboard Template" />
-              <CompresseurK244 />
+              <PageTitle />
+              <AnalysesLaboratoireGraphique />
             </>
           }
         />
         <Route
-          path="/atm-merox-preflash"
+          path="/graphique/mouvement-des-bacs"
           element={
             <>
-              <PageTitle title="ATM/MEROX & PRE-FLASH | OpsDigital - Tailwind CSS Admin Dashboard Template" />
-              <AtmMeroxPreFlash />
+              <PageTitle />
+              <AnalysesLaboratoireGraphique />
             </>
           }
         />
         <Route
-          path="/mouvement-des-bacs"
+          path="/graphique/compresseur-k245"
           element={
             <>
-              <PageTitle title="Mouvement des bacs | OpsDigital" />
-              <MouvementDesBacs />
+              <PageTitle />
+              <AnalysesLaboratoireGraphique />
             </>
           }
         />
         <Route
-          path="/production-valeur-electricite"
+          path="/graphique/compresseur-k244"
           element={
             <>
-              <PageTitle title="Valeur / Électricité | OpsDigital - Tailwind CSS Admin Dashboard Template" />
-              <ProductionValeurElectricite />
+              <PageTitle />
+              <AnalysesLaboratoireGraphique />
+            </>
+          }
+        />
+        <Route
+          path="/graphique/atm-merox-pre-flash"
+          element={
+            <>
+              <PageTitle />
+              <AnalysesLaboratoireGraphique />
+            </>
+          }
+        />
+        <Route
+          path="/graphique/gaz"
+          element={
+            <>
+              <PageTitle />
+              <AnalysesLaboratoireGraphique />
             </>
           }
         />
@@ -170,7 +174,7 @@ function App() {
           path="/profile"
           element={
             <>
-              <PageTitle title="Mon profil | OpsDigital - Tailwind CSS Admin Dashboard Template" />
+              <PageTitle />
               <Profile />
             </>
           }
@@ -179,13 +183,14 @@ function App() {
           path="/settings"
           element={
             <>
-              <PageTitle title="Paramètres | OpsDigital - Tailwind CSS Admin Dashboard Template" />
+              <PageTitle />
               <Settings />
             </>
           }
         />
       </Routes>
-        </DefaultLayout>
+          </DefaultLayout>
+        </ProtectedRoute>
       } />
     </Routes>
   );

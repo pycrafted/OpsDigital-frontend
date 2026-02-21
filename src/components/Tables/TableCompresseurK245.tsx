@@ -1,80 +1,74 @@
 import React from 'react';
+import {
+  COMPRESSEUR_K245_CATEGORIES as categories,
+  COMPRESSEUR_K245_HOURS,
+  compresseurK245HourLabels as hourLabels,
+  type HourRow,
+} from '../../data/compresseurK245';
 
-interface CategoryData {
-  category: string;
-  subRows: string[];
-}
-
-interface HourRow {
-  hour: string;
-  values: Record<string, string>; // key: "category_subRow", value: cell value
-}
-
-const categories: CategoryData[] = [
-  {
-    category: 'huile',
-    subRows: ['t.h 27 tt 146', 'p.h 27 pt 136 a/b', 'p.filtre 27 pdt 147'],
-  },
-  {
-    category: 'eau',
-    subRows: ['eau 24 ti 155', 'eau 27 pi 157'],
-  },
-  {
-    category: 'hydrogene',
-    subRows: ['p.asp 27 pt 100 a/b', 'p.ref 27 pt 101 a/b', "t° de ch b 27 ti 104 a/b", "t° de ch b 27 ti 105 a/b", '% charge comp'],
-  },
-  {
-    category: 'azote',
-    subRows: ['n° cadre', 'p.n 27 pi 122', 'p cadre'],
-  },
-  {
-    category: 'air',
-    subRows: ['air ins 27 pi 180', 'palier comp 27 ti 117', 'palier comp 27 ti 118', 't.palier cne 27 ti 116', 't.palier ce 27 ti 112'],
-  },
-  {
-    category: 'consommation',
-    subRows: ['consom go d202', 'consom go d314b', 'consom fo d349', 'consom fo d362', 'consom eb th'],
-  },
-  {
-    category: 'cotes',
-    subRows: ['cote d 202', 'cote d350'],
-  },
-];
-
-const hours = ['h7', 'h11', 'h15', 'h19', 'h23', 'h3'] as const;
-const hourLabels = { h7: '7h', h11: '11h', h15: '15h', h19: '19h', h23: '23h', h3: '3h' };
-const hourColors = { h7: '#fff2db', h11: '#e1f8f0', h15: '#feeaea', h19: '#fff2db', h23: '#e1f8f0', h3: '#feeaea' };
-
+const hours = [...COMPRESSEUR_K245_HOURS];
 const allSubRowNames = [...new Set(categories.flatMap((c) => c.subRows))] as string[];
 
-// Colors to differentiate subRows within the same category
-const subRowColors = ['#fff2db', '#e1f8f0', '#feeaea', '#e8f4f8', '#f0e8ff', '#fff8e1'];
+const CHEVRON_DOWN = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden>
+    <path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" />
+  </svg>
+);
 
-// Create initial data structure
-const createInitialData = (): HourRow[] => {
-  const hourRows: HourRow[] = [];
-  hours.forEach((hour) => {
-    const values: Record<string, string> = {};
-    categories.forEach((cat) => {
-      cat.subRows.forEach((subRow) => {
-        const key = `${cat.category}_${subRow}`;
-        values[key] = '';
-      });
-    });
-    hourRows.push({ hour, values });
-  });
-  return hourRows;
-};
+const CHECK = (
+  <svg className="h-4 w-4 shrink-0 text-primary" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+  </svg>
+);
 
-const TableCompresseurK245 = () => {
-  const [data, setData] = React.useState<HourRow[]>(createInitialData());
-  const [selectedHours, setSelectedHours] = React.useState<string[]>(hours.map(h => h));
+const LOCK_CLOSED = (
+  <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+  </svg>
+);
+
+const LOCK_OPEN = (
+  <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+    <path fillRule="evenodd" d="M14.5 1A4.5 4.5 0 0010 5.5V9H3a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-1V5.5A4.5 4.5 0 0014.5 1zM12 9V5.5a2 2 0 10-4 0V9h4z" clipRule="evenodd" />
+  </svg>
+);
+
+const VALIDATE_ICON = (
+  <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+  </svg>
+);
+
+export interface TableCompresseurK245Props {
+  data: HourRow[];
+  onDataChange: (data: HourRow[]) => void;
+  selectedDate: string;
+  onDateChange: (date: string) => void;
+  loading?: boolean;
+  onValidate?: () => void;
+  saving?: boolean;
+  showValidateButton?: boolean;
+  lastSavedData?: HourRow[] | null;
+}
+
+const TableCompresseurK245 = ({
+  data,
+  onDataChange,
+  selectedDate,
+  onDateChange,
+  loading = false,
+  onValidate,
+  saving = false,
+  showValidateButton = false,
+  lastSavedData = null,
+}: TableCompresseurK245Props) => {
+  const [selectedHours, setSelectedHours] = React.useState<string[]>(hours.map((h) => h));
   const [selectedCategories, setSelectedCategories] = React.useState<string[]>(categories.map(c => c.category));
   const [selectedSubRows, setSelectedSubRows] = React.useState<string[]>([...allSubRowNames]);
+  const [canEdit, setCanEdit] = React.useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = React.useState(false);
   const [showHourDropdown, setShowHourDropdown] = React.useState(false);
   const [showSubRowDropdown, setShowSubRowDropdown] = React.useState(false);
-  const [currentPage, setCurrentPage] = React.useState(0);
   const categoryDropdownRef = React.useRef<HTMLDivElement>(null);
   const categoryTriggerRef = React.useRef<HTMLDivElement>(null);
   const hourDropdownRef = React.useRef<HTMLDivElement>(null);
@@ -95,7 +89,7 @@ const TableCompresseurK245 = () => {
         [categoryKey]: value,
       },
     };
-    setData(newData);
+    onDataChange(newData);
   };
 
   const handleHourToggle = (hour: string) => {
@@ -119,38 +113,26 @@ const TableCompresseurK245 = () => {
   // Close dropdowns when clicking outside
   React.useEffect(() => {
     const clickHandler = ({ target }: MouseEvent) => {
-      if (categoryDropdownRef.current) {
-        if (
-          !showCategoryDropdown ||
-          categoryDropdownRef.current.contains(target as Node) ||
-          categoryTriggerRef.current?.contains(target as Node)
-        ) {
-          // Do nothing
-        } else {
-          setShowCategoryDropdown(false);
-        }
+      if (
+        categoryDropdownRef.current &&
+        !categoryDropdownRef.current.contains(target as Node) &&
+        !categoryTriggerRef.current?.contains(target as Node)
+      ) {
+        setShowCategoryDropdown(false);
       }
-      if (hourDropdownRef.current) {
-        if (
-          !showHourDropdown ||
-          hourDropdownRef.current.contains(target as Node) ||
-          hourTriggerRef.current?.contains(target as Node)
-        ) {
-          // Do nothing
-        } else {
-          setShowHourDropdown(false);
-        }
+      if (
+        hourDropdownRef.current &&
+        !hourDropdownRef.current.contains(target as Node) &&
+        !hourTriggerRef.current?.contains(target as Node)
+      ) {
+        setShowHourDropdown(false);
       }
-      if (subRowDropdownRef.current) {
-        if (
-          !showSubRowDropdown ||
-          subRowDropdownRef.current.contains(target as Node) ||
-          subRowTriggerRef.current?.contains(target as Node)
-        ) {
-          // Do nothing
-        } else {
-          setShowSubRowDropdown(false);
-        }
+      if (
+        subRowDropdownRef.current &&
+        !subRowDropdownRef.current.contains(target as Node) &&
+        !subRowTriggerRef.current?.contains(target as Node)
+      ) {
+        setShowSubRowDropdown(false);
       }
     };
     document.addEventListener('click', clickHandler);
@@ -160,450 +142,229 @@ const TableCompresseurK245 = () => {
   // Filter data based on selections
   const filteredHours = hours.filter((h) => selectedHours.includes(h));
   const filteredCategories = categories.filter((c) => selectedCategories.includes(c.category));
-  
-  // 2 tableaux équilibrés (~12–13 colonnes chacun) pour éviter le scroll horizontal
-  const tableGroups: string[][] = [
-    ['hydrogene', 'air', 'huile'],           // 5+5+3 = 13 sous-colonnes
-    ['azote', 'eau', 'consommation', 'cotes'], // 3+2+5+2 = 12 sous-colonnes
-  ];
-  
-  // Filter table groups to only include categories that are selected
-  const availableGroups = tableGroups
-    .map(group => group.filter(cat => filteredCategories.some(fc => fc.category === cat)))
-    .filter(group => group.length > 0);
-  
-  // Ensure currentPage is valid
-  const totalPages = Math.max(1, availableGroups.length);
-  React.useEffect(() => {
-    if (currentPage >= totalPages) {
-      setCurrentPage(0);
-    }
-  }, [totalPages, currentPage]);
-  
-  const validPage = Math.min(currentPage, totalPages - 1);
-  const currentGroupCategories = availableGroups[validPage] || [];
   const currentCategories = filteredCategories
-    .filter((cat) => currentGroupCategories.includes(cat.category))
     .map((cat) => ({
       ...cat,
       subRows: cat.subRows.filter((sub) => selectedSubRows.includes(sub)),
     }))
     .filter((cat) => cat.subRows.length > 0);
 
-  const totalSubColumns = currentCategories.reduce((sum, cat) => sum + cat.subRows.length, 0);
+  const filterTriggerClass =
+    'flex cursor-pointer items-center gap-2 rounded-xl border border-stroke/70 bg-white/90 px-4 py-2.5 text-sm font-medium text-[#3c50e0] shadow-sm transition hover:border-primary/50 hover:bg-white hover:text-primary dark:border-strokedark dark:bg-boxdark dark:text-white dark:hover:border-primary dark:hover:bg-meta-4/80 dark:hover:text-white';
+  const dropdownPanelClass =
+    'absolute left-0 top-full z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark';
 
   return (
-    <div className="rounded-sm border-0 bg-whiten px-5 pt-6 pb-2.5 dark:bg-boxdark-2 sm:px-7.5 xl:pb-1">
-      {/* Filter Section */}
-      <div className="mb-4 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-        {/* Category Filter */}
-        <div className="w-full sm:w-64">
-          <label className="mb-1 block text-xs text-black dark:text-white">
-            Filtrer par catégorie
-          </label>
-          <div className="relative z-20">
-            <div className="relative flex flex-col items-center">
-              <div
-                ref={categoryTriggerRef}
-                onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                className="w-full cursor-pointer"
-              >
-                <div className="mb-1 flex rounded border border-stroke bg-white py-1 pl-2 pr-2 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-white">
-                  <div className="flex flex-auto flex-wrap gap-2">
-                    <div className="flex-1">
-                      <input
-                        placeholder={
-                          selectedCategories.length > 0
-                            ? `${selectedCategories.length} catégorie${selectedCategories.length > 1 ? 's' : ''} sélectionnée${selectedCategories.length > 1 ? 's' : ''}`
-                            : 'Sélectionner des catégories'
-                        }
-                        className="h-full w-full appearance-none bg-transparent p-0.5 px-1 text-xs outline-none text-black dark:text-white"
-                        readOnly
-                      />
-                    </div>
-                  </div>
-                  <div className="flex w-6 items-center py-0.5 pl-0.5 pr-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                      className="h-4 w-4 cursor-pointer outline-none focus:outline-none"
-                    >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <g opacity="0.8">
-                          <path
-                            fillRule="evenodd"
-                            clipRule="evenodd"
-                            d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z"
-                            fill="#637381"
-                          ></path>
-                        </g>
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div className="w-full px-4">
-                <div
-                  className={`max-h-select absolute top-full left-0 z-40 w-full overflow-y-auto rounded bg-white shadow dark:bg-form-input ${
-                    showCategoryDropdown ? '' : 'hidden'
-                  }`}
-                  ref={categoryDropdownRef}
-                >
-                  <div className="flex w-full flex-col">
-                    {categories.map((cat) => {
-                      const isSelected = selectedCategories.includes(cat.category);
-                      return (
-                        <div key={cat.category}>
-                          <div
-                            className={`w-full cursor-pointer rounded-t border-b border-stroke hover:bg-primary/5 dark:border-form-strokedark ${
-                              isSelected ? 'bg-primary/10 dark:bg-primary/20' : ''
-                            }`}
-                            onClick={() => handleCategoryToggle(cat.category)}
-                          >
-                            <div
-                              className={`relative flex w-full items-center border-l-2 p-1 pl-1.5 ${
-                                isSelected ? 'border-primary bg-primary/5' : 'border-transparent'
-                              }`}
-                            >
-                              <div className="flex w-full items-center">
-                                {isSelected && (
-                                  <svg
-                                    className="mr-1.5 h-3 w-3 text-primary"
-                                    fill="currentColor"
-                                    viewBox="0 0 20 20"
-                                  >
-                                    <path
-                                      fillRule="evenodd"
-                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                      clipRule="evenodd"
-                                    />
-                                  </svg>
-                                )}
-                                <div
-                                  className={`text-xs leading-4 ${
-                                    isSelected
-                                      ? 'font-semibold text-primary dark:text-white'
-                                      : 'text-black dark:text-white'
-                                  }`}
-                                >
-                                  {cat.category}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-6">
+      {loading && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-white/80 dark:bg-boxdark/80">
+          <p className="text-sm font-medium text-bodydark2">Chargement…</p>
         </div>
-
-        {/* Hour Filter */}
-        <div className="w-full sm:w-64">
-          <label className="mb-1 block text-xs text-black dark:text-white">
-            Filtrer par heure
-          </label>
-          <div className="relative z-20">
-            <div className="relative flex flex-col items-center">
-              <div
-                ref={hourTriggerRef}
-                onClick={() => setShowHourDropdown(!showHourDropdown)}
-                className="w-full cursor-pointer"
-              >
-                <div className="mb-1 flex rounded border border-stroke bg-white py-1 pl-2 pr-2 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-white">
-                  <div className="flex flex-auto flex-wrap gap-2">
-                    <div className="flex-1">
-                      <input
-                        placeholder={
-                          selectedHours.length > 0
-                            ? `${selectedHours.length} heure${selectedHours.length > 1 ? 's' : ''} sélectionnée${selectedHours.length > 1 ? 's' : ''}`
-                            : 'Sélectionner des heures'
-                        }
-                        className="h-full w-full appearance-none bg-transparent p-0.5 px-1 text-xs outline-none text-black dark:text-white"
-                        readOnly
-                      />
-                    </div>
-                  </div>
-                  <div className="flex w-6 items-center py-0.5 pl-0.5 pr-0.5">
+      )}
+      {/* Barre de filtres (centrés) + bouton cadenas à droite */}
+      <div className="flex w-full flex-shrink-0 items-center gap-2">
+        <div className="flex-1" />
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {/* Catégories */}
+          <div className="relative" ref={categoryDropdownRef}>
+            <button type="button" ref={categoryTriggerRef} onClick={() => setShowCategoryDropdown(!showCategoryDropdown)} className={filterTriggerClass}>
+              Catégories
+              <span className={showCategoryDropdown ? 'rotate-180' : ''}>{CHEVRON_DOWN}</span>
+            </button>
+            {showCategoryDropdown && (
+              <div className={`${dropdownPanelClass} min-w-[14rem]`}>
+                {categories.map((cat) => {
+                  const isSelected = selectedCategories.includes(cat.category);
+                  return (
                     <button
+                      key={cat.category}
                       type="button"
-                      onClick={() => setShowHourDropdown(!showHourDropdown)}
-                      className="h-4 w-4 cursor-pointer outline-none focus:outline-none"
+                      onClick={() => handleCategoryToggle(cat.category)}
+                      className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${
+                        isSelected ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'
+                      }`}
                     >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <g opacity="0.8">
-                          <path
-                            fillRule="evenodd"
-                            clipRule="evenodd"
-                            d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z"
-                            fill="#637381"
-                          ></path>
-                        </g>
-                      </svg>
+                      {isSelected && CHECK}
+                      <span className={isSelected ? 'font-medium' : ''}>{cat.category}</span>
                     </button>
-                  </div>
-                </div>
+                  );
+                })}
               </div>
-              <div className="w-full px-4">
-                <div
-                  className={`max-h-select absolute top-full left-0 z-40 w-full overflow-y-auto rounded bg-white shadow dark:bg-form-input ${
-                    showHourDropdown ? '' : 'hidden'
-                  }`}
-                  ref={hourDropdownRef}
-                >
-                  <div className="flex w-full flex-col">
-                    {hours.map((hour) => {
-                      const isSelected = selectedHours.includes(hour);
-                      return (
-                        <div key={hour}>
-                          <div
-                            className={`w-full cursor-pointer rounded-t border-b border-stroke hover:bg-primary/5 dark:border-form-strokedark ${
-                              isSelected ? 'bg-primary/10 dark:bg-primary/20' : ''
-                            }`}
-                            onClick={() => handleHourToggle(hour)}
-                          >
-                            <div
-                              className={`relative flex w-full items-center border-l-2 p-1 pl-1.5 ${
-                                isSelected ? 'border-primary bg-primary/5' : 'border-transparent'
-                              }`}
-                            >
-                              <div className="flex w-full items-center">
-                                {isSelected && (
-                                  <svg
-                                    className="mr-1.5 h-3 w-3 text-primary"
-                                    fill="currentColor"
-                                    viewBox="0 0 20 20"
-                                  >
-                                    <path
-                                      fillRule="evenodd"
-                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                      clipRule="evenodd"
-                                    />
-                                  </svg>
-                                )}
-                                <div
-                                  className={`text-xs leading-4 ${
-                                    isSelected
-                                      ? 'font-semibold text-primary dark:text-white'
-                                      : 'text-black dark:text-white'
-                                  }`}
-                                >
-                                  {hourLabels[hour]}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
-        </div>
 
-        {/* Filtrer par ligne */}
-        <div className="w-full sm:w-64">
-          <label className="mb-1 block text-xs text-black dark:text-white">
-            Filtrer par ligne
-          </label>
-          <div className="relative z-20" ref={subRowDropdownRef}>
-            <div
-              ref={subRowTriggerRef}
-              onClick={() => setShowSubRowDropdown(!showSubRowDropdown)}
-              className="cursor-pointer"
-            >
-              <div className="mb-1 flex rounded border border-stroke bg-white py-1 pl-2 pr-2 dark:border-form-strokedark dark:bg-white">
-                <div className="flex-1">
-                  <input
-                    placeholder={
-                      selectedSubRows.length > 0
-                        ? `${selectedSubRows.length} ligne(s) sélectionnée(s)`
-                        : 'Sélectionner des lignes'
-                    }
-                    className="h-full w-full appearance-none bg-transparent p-0.5 px-1 text-xs outline-none text-black dark:text-white"
-                    readOnly
-                  />
-                </div>
-                <div className="flex w-6 items-center">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="opacity-80">
-                    <path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="#637381" />
-                  </svg>
-                </div>
+          {/* Créneaux */}
+          <div className="relative" ref={hourDropdownRef}>
+            <button type="button" ref={hourTriggerRef} onClick={() => setShowHourDropdown(!showHourDropdown)} className={filterTriggerClass}>
+              Créneaux
+              <span className={showHourDropdown ? 'rotate-180' : ''}>{CHEVRON_DOWN}</span>
+            </button>
+            {showHourDropdown && (
+              <div className={`${dropdownPanelClass} min-w-[10rem]`}>
+                {hours.map((hour) => {
+                  const isSelected = selectedHours.includes(hour);
+                  return (
+                    <button
+                      key={hour}
+                      type="button"
+                      onClick={() => handleHourToggle(hour)}
+                      className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${
+                        isSelected ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'
+                      }`}
+                    >
+                      {isSelected && CHECK}
+                      {hourLabels[hour]}
+                    </button>
+                  );
+                })}
               </div>
-            </div>
+            )}
+          </div>
+
+          {/* Indicateurs */}
+          <div className="relative" ref={subRowDropdownRef}>
+            <button type="button" ref={subRowTriggerRef} onClick={() => setShowSubRowDropdown(!showSubRowDropdown)} className={filterTriggerClass}>
+              Indicateurs
+              <span className={showSubRowDropdown ? 'rotate-180' : ''}>{CHEVRON_DOWN}</span>
+            </button>
             {showSubRowDropdown && (
-              <div className="absolute left-0 top-full z-40 max-h-60 w-full overflow-y-auto rounded bg-white shadow dark:bg-form-input">
+              <div className={`${dropdownPanelClass} min-w-[18rem] max-h-72`}>
                 {allSubRowNames.map((sub) => {
                   const isSelected = selectedSubRows.includes(sub);
                   return (
-                    <div
+                    <button
                       key={sub}
-                      className={`cursor-pointer border-b border-stroke p-1.5 pl-2 text-xs hover:bg-primary/5 dark:border-form-strokedark ${
-                        isSelected ? 'bg-primary/10 dark:bg-primary/20' : ''
-                      }`}
+                      type="button"
                       onClick={() => handleSubRowToggle(sub)}
+                      className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${
+                        isSelected ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'
+                      }`}
                     >
-                      {isSelected && (
-                        <svg className="mr-1.5 inline h-3 w-3 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                      <span className={isSelected ? 'font-semibold text-primary dark:text-white' : 'text-black dark:text-white'}>
-                        {sub}
-                      </span>
-                    </div>
+                      {isSelected && CHECK}
+                      <span className={isSelected ? 'font-medium' : ''}>{sub}</span>
+                    </button>
                   );
                 })}
               </div>
             )}
           </div>
         </div>
-      </div>
-
-      <div className="w-full overflow-y-auto overflow-x-hidden" style={{ maxHeight: '70vh' }}>
-        <table className="w-full table-fixed">
-          <thead>
-            <tr className="text-left" style={{ backgroundColor: '#344256' }}>
-              <th className="w-[8%] min-w-0 bg-whiten py-2 px-2 text-xs font-medium text-black dark:bg-boxdark-2 dark:text-white xl:pl-4" rowSpan={2}>
-              </th>
-              {currentCategories.map((cat, index) => (
-                <th
-                  key={cat.category}
-                  colSpan={cat.subRows.length}
-                  className="min-w-0 py-2 px-2 text-xs text-center font-medium text-white dark:border-strokedark"
-                  style={{
-                    borderRight: index < currentCategories.length - 1 ? '1px solid white' : 'none'
-                  }}
-                >
-                  {cat.category}
-                </th>
-              ))}
-            </tr>
-            <tr className="text-left" style={{ backgroundColor: '#344256' }}>
-              {currentCategories.flatMap((cat) =>
-                cat.subRows.map((subRow, subIndex) => ({
-                  category: cat.category,
-                  subRow,
-                  subIndex,
-                }))
-              ).map((item, index, array) => (
-                <th
-                  key={`${item.category}_${item.subRow}`}
-                  className="min-w-0 py-1.5 px-2 text-center text-[10px] font-medium text-black dark:border-strokedark"
-                  style={{ 
-                    backgroundColor: subRowColors[item.subIndex % subRowColors.length],
-                    borderRight: index < array.length - 1 ? '1px solid black' : 'none'
-                  }}
-                >
-                  {item.subRow}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data
-              .filter((hourRow) => filteredHours.includes(hourRow.hour))
-              .map((hourRow, hourIndex) => {
-                const originalHourIndex = data.findIndex((hr) => hr.hour === hourRow.hour);
-                return (
-                  <tr key={hourRow.hour}>
-                    <td
-                      className="min-w-0 overflow-hidden border-b border-r border-[#eee] py-1.5 px-2 pl-3 text-xs dark:border-strokedark xl:pl-4"
-                      style={{ backgroundColor: '#d1d5db' }}
-                    >
-                      <p className="truncate font-medium text-black">{hourLabels[hourRow.hour as keyof typeof hourLabels]}</p>
-                    </td>
-                    {currentCategories.map((cat) =>
-                      cat.subRows.map((subRow) => {
-                        const key = `${cat.category}_${subRow}`;
-                        const value = hourRow.values[key] || '';
-                        const hasValue = value && value.trim() !== '';
-                        return (
-                          <td
-                            key={key}
-                            className={`min-w-0 border-b border-r border-[#eee] py-1 px-1 dark:border-strokedark ${
-                              hasValue ? 'bg-gray-100 dark:bg-meta-4' : 'bg-white'
-                            }`}
-                          >
-                            <input
-                              type="text"
-                              value={value}
-                              onChange={(e) => handleChange(originalHourIndex, key, e.target.value)}
-                              className="w-full min-w-0 bg-transparent text-right text-xs font-semibold text-black focus:outline-none dark:text-white"
-                              style={{
-                                backgroundColor: 'transparent',
-                              }}
-                            />
-                          </td>
-                        );
-                      })
-                    )}
-                  </tr>
-                );
-              })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination Controls */}
-      {availableGroups.length > 1 && (
-        <div className="mt-4 flex items-center justify-center gap-2">
+        <div className="flex flex-1 justify-end items-center gap-2">
+          {showValidateButton && (
+            <button
+              type="button"
+              onClick={() => onValidate?.()}
+              disabled={saving}
+              className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-stroke/70 bg-white/90 px-3 text-green-600 transition hover:border-green-500 hover:bg-white hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-strokedark dark:bg-boxdark dark:text-green-400 dark:hover:border-green-500 dark:hover:bg-meta-4/80 dark:hover:text-green-300"
+              aria-label="Valider et sauvegarder les modifications"
+            >
+              {VALIDATE_ICON}
+              <span className="text-sm font-medium text-inherit">{saving ? 'Sauvegarde…' : 'Valider'}</span>
+            </button>
+          )}
           <button
-            onClick={() => setCurrentPage(Math.max(0, validPage - 1))}
-            disabled={validPage === 0}
-            className={`rounded px-3 py-1.5 text-xs font-medium transition !text-white ${
-              validPage === 0
-                ? 'cursor-not-allowed bg-gray-200 dark:bg-gray-700'
-                : 'bg-primary hover:bg-primary/90'
-            }`}
+            type="button"
+            onClick={() => setCanEdit((prev) => !prev)}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-stroke/70 bg-white/90 text-primary transition hover:border-primary/50 hover:bg-white dark:border-strokedark dark:bg-boxdark dark:hover:border-primary dark:hover:bg-meta-4/80 dark:text-primary"
+            aria-label="Modification directe"
           >
-            Précédent
-          </button>
-          <div className="flex gap-1">
-            {availableGroups.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentPage(index)}
-                className={`rounded px-3 py-1.5 text-xs font-medium transition ${
-                  validPage === index
-                    ? 'bg-primary text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                }`}
-              >
-                {index + 1}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => setCurrentPage(Math.min(totalPages - 1, validPage + 1))}
-            disabled={validPage === totalPages - 1}
-            className={`rounded px-3 py-1.5 text-xs font-medium transition !text-white ${
-              validPage === totalPages - 1
-                ? 'cursor-not-allowed bg-gray-200 dark:bg-gray-700'
-                : 'bg-primary hover:bg-primary/90'
-            }`}
-          >
-            Suivant
+            {canEdit ? LOCK_OPEN : LOCK_CLOSED}
           </button>
         </div>
-      )}
+      </div>
+
+      {/* Tableau — même design que les autres tableaux */}
+      <div className="min-w-0 max-h-[calc(100vh-14rem)] overflow-auto">
+        <div className="min-h-full w-max">
+          <table className="min-w-full table-fixed border-collapse" style={{ tableLayout: 'fixed' }}>
+            <colgroup>
+              <col className="w-28 min-w-[6.5rem] max-w-[7rem]" />
+              {currentCategories.flatMap((cat) =>
+                cat.subRows.map((subRow) => (
+                  <col key={`col-${cat.category}_${subRow}`} className="w-[7rem] min-w-[7rem] max-w-[7rem]" />
+                ))
+              )}
+            </colgroup>
+            <thead>
+              <tr>
+                <th
+                  rowSpan={2}
+                  className="sticky left-0 z-20 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 border-t-0 border-l-0 bg-[#eff6ff] py-1.5 pl-2 pr-2 dark:border-strokedark dark:border-t-0 dark:border-l-0 dark:bg-[#273342]"
+                  aria-label=""
+                />
+                {currentCategories.map((cat) => (
+                  <th
+                    key={cat.category}
+                    colSpan={cat.subRows.length}
+                    className="sticky top-0 z-10 min-w-0 border-b border-r border-stroke/70 bg-primary py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark"
+                  >
+                    {cat.category}
+                  </th>
+                ))}
+              </tr>
+              <tr>
+                {currentCategories.flatMap((cat) =>
+                  cat.subRows.map((subRow) => (
+                    <th
+                      key={`${cat.category}_${subRow}`}
+                      className="sticky top-7 z-10 w-[7rem] min-w-[7rem] max-w-[7rem] border-r border-b border-stroke/70 bg-primary/90 py-1 px-1 text-center text-[11px] font-medium text-white/95 dark:border-strokedark"
+                    >
+                      <span className="block truncate" title={subRow}>{subRow}</span>
+                    </th>
+                  ))
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {data
+                .filter((hourRow) => filteredHours.includes(hourRow.hour))
+                .map((hourRow) => {
+                  const originalHourIndex = data.findIndex((hr) => hr.hour === hourRow.hour);
+                  return (
+                    <tr
+                      key={hourRow.hour}
+                      className={`group border-b border-stroke/50 odd:bg-slate-100 even:bg-white transition-colors dark:border-strokedark/70 dark:odd:bg-meta-4/30 dark:even:bg-boxdark ${canEdit ? 'hover:bg-slate-200 dark:hover:bg-meta-4/50' : ''}`}
+                    >
+                      <td className={`sticky left-0 z-10 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 bg-[#3c50e0] py-1 pl-2 pr-2 text-sm font-medium text-white dark:border-strokedark dark:bg-[#3c50e0] dark:text-white ${canEdit ? 'group-hover:bg-[#3c50e0]/90 dark:group-hover:bg-[#3c50e0]/90' : ''}`}>
+                        <span className="block truncate" title={hourLabels[hourRow.hour as keyof typeof hourLabels]}>{hourLabels[hourRow.hour as keyof typeof hourLabels]}</span>
+                      </td>
+                      {currentCategories.flatMap((cat) =>
+                        cat.subRows.map((subRow) => {
+                          const key = `${cat.category}_${subRow}`;
+                          const value = hourRow.values[key] || '';
+                          const savedHourRow = lastSavedData != null && lastSavedData.length > 0 ? lastSavedData[originalHourIndex] : null;
+                          const savedValue = savedHourRow?.values?.[key];
+                          const isModified = savedHourRow != null && savedValue !== value;
+                          return (
+                            <td
+                              key={key}
+                              className={`w-[7rem] min-w-[7rem] max-w-[7rem] border-r border-stroke/50 py-0 px-1 dark:border-strokedark/70 ${isModified ? 'bg-[#24303f] dark:bg-[#f1f5f9]' : 'bg-transparent'}`}
+                            >
+                              <input
+                                type="text"
+                                value={value}
+                                readOnly={!canEdit}
+                                onChange={(e) => handleChange(originalHourIndex, key, e.target.value)}
+                                className={`w-full py-1 pr-2 text-right text-sm font-medium outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 ${
+                                  isModified
+                                    ? 'bg-[#24303f] text-white placeholder:text-white/50 dark:bg-[#f1f5f9] dark:text-black dark:placeholder:text-black/50'
+                                    : 'bg-transparent ' + (canEdit
+                                      ? 'text-slate-800 focus:ring-2 focus:ring-primary/20 dark:text-slate-200'
+                                      : 'cursor-default text-slate-800 dark:text-slate-200')
+                                }`}
+                                placeholder="—"
+                              />
+                            </td>
+                          );
+                        })
+                      )}
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 };

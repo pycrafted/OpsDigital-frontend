@@ -1,41 +1,11 @@
 import React from 'react';
-
-const columns = [
-  'naphta sesulf',
-  'kero S merox',
-  'brut injection',
-  'brut',
-  'butane',
-  'essence',
-  'naphta',
-  'reform AT',
-  'kéro',
-  'naphta charge',
-  'go',
-  'go lourd',
-  'résidu',
-  'slop',
-  'go de tete',
-] as const;
-
-const rows = ['8h', '12h', '16h', '20h', '00h', '04h'] as const;
-
-/** Types de bac pour le stockage (sélection par produit) */
-const BAC_TYPES = ['—', 'T 543', 'T 544'] as const;
-
-type ColumnKey = (typeof columns)[number];
-type RowKey = (typeof rows)[number];
-
-const createInitialData = (): Record<RowKey, Record<ColumnKey, string>> => {
-  const data = {} as Record<RowKey, Record<ColumnKey, string>>;
-  rows.forEach((row) => {
-    data[row] = {} as Record<ColumnKey, string>;
-    columns.forEach((col) => {
-      data[row][col] = '';
-    });
-  });
-  return data;
-};
+import {
+  GAZ_COLUMNS as columns,
+  GAZ_HOURS as rows,
+  type HourRow,
+  type GazColumnKey,
+  type GazHourKey,
+} from '../../data/gaz';
 
 const CHEVRON_DOWN = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden>
@@ -67,55 +37,31 @@ const VALIDATE_ICON = (
   </svg>
 );
 
-export interface BacTypeOption {
-  id: number;
-  name: string;
-  order: number;
-}
-
-interface TableMouvementDesBacsProps {
+export interface TableGazProps {
+  data: HourRow[];
+  onDataChange: (data: HourRow[]) => void;
   selectedDate: string;
   onDateChange: (date: string) => void;
-  /** Données en mode contrôlé : [heure][produit] = valeur */
-  data?: Record<RowKey, Record<ColumnKey, string>>;
-  /** Callback (données tableau, bacs par produit) */
-  onDataChange?: (newData: Record<RowKey, Record<ColumnKey, string>>, newBacs: Record<ColumnKey, string>) => void;
-  /** Type de bac par produit (mode contrôlé) */
-  bacTypeByProduct?: Record<ColumnKey, string>;
   loading?: boolean;
   onValidate?: () => void;
   saving?: boolean;
   showValidateButton?: boolean;
-  bacTypesOptions?: BacTypeOption[];
-  /** Dernières données sauvegardées (pour surligner les cellules modifiées) */
-  lastSavedData?: { hour: string; values: Record<string, string> }[] | null;
+  lastSavedData?: HourRow[] | null;
 }
 
-const createInitialBacTypes = (): Record<ColumnKey, string> => {
-  const init = {} as Record<ColumnKey, string>;
-  columns.forEach((col) => {
-    init[col] = BAC_TYPES[0]; // '—' par défaut
-  });
-  return init;
-};
-
-const TableMouvementDesBacs = ({
-  selectedDate,
-  onDateChange,
-  data: controlledData,
+const TableGaz = ({
+  data,
   onDataChange,
-  bacTypeByProduct: controlledBacs,
+  selectedDate: _selectedDate,
+  onDateChange: _onDateChange,
   loading = false,
   onValidate,
   saving = false,
   showValidateButton = false,
-  bacTypesOptions,
   lastSavedData = null,
-}: TableMouvementDesBacsProps) => {
-  const [internalData, setInternalData] = React.useState(createInitialData);
-  const [internalBacs, setInternalBacs] = React.useState<Record<ColumnKey, string>>(createInitialBacTypes);
-  const [selectedRows, setSelectedRows] = React.useState<RowKey[]>(() => [...rows]);
-  const [selectedColumns, setSelectedColumns] = React.useState<ColumnKey[]>(() => [...columns]);
+}: TableGazProps) => {
+  const [selectedRows, setSelectedRows] = React.useState<GazHourKey[]>(() => [...rows]);
+  const [selectedColumnKeys, setSelectedColumnKeys] = React.useState<GazColumnKey[]>(() => columns.map((c) => c.key));
   const [canEdit, setCanEdit] = React.useState(false);
   const [showRowDropdown, setShowRowDropdown] = React.useState(false);
   const [showColumnDropdown, setShowColumnDropdown] = React.useState(false);
@@ -123,46 +69,33 @@ const TableMouvementDesBacs = ({
   const rowTriggerRef = React.useRef<HTMLButtonElement>(null);
   const columnDropdownRef = React.useRef<HTMLDivElement>(null);
   const columnTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const tableRef = React.useRef<HTMLTableElement>(null);
 
-  const isControlled = controlledData != null && onDataChange != null;
-  const data = isControlled ? controlledData : internalData;
-  const bacTypeByProduct = controlledBacs != null ? controlledBacs : internalBacs;
-
-  const handleBacTypeChange = (col: ColumnKey, value: string) => {
-    const newBacs = { ...bacTypeByProduct, [col]: value };
-    if (isControlled) {
-      onDataChange(data, newBacs);
-    } else {
-      setInternalBacs(newBacs);
-    }
-  };
-
-  const handleChange = (row: RowKey, col: ColumnKey, value: string) => {
-    const newData = {
-      ...data,
-      [row]: { ...(data[row] ?? {}), [col]: value },
+  const handleChange = (rowHour: GazHourKey, col: GazColumnKey, value: string) => {
+    const idx = data.findIndex((r) => r.hour === rowHour);
+    if (idx === -1) return;
+    const newData = [...data];
+    newData[idx] = {
+      ...newData[idx],
+      values: { ...newData[idx].values, [col]: value },
     };
-    if (isControlled) {
-      onDataChange(newData, bacTypeByProduct);
-    } else {
-      setInternalData(newData);
-    }
+    onDataChange(newData);
   };
 
-  const handleRowToggle = (row: RowKey) => {
+  const handleRowToggle = (row: GazHourKey) => {
     setSelectedRows((prev) =>
       prev.includes(row) ? prev.filter((r) => r !== row) : [...prev, row]
     );
   };
-  const handleColumnToggle = (col: ColumnKey) => {
-    setSelectedColumns((prev) =>
+  const handleColumnToggle = (col: GazColumnKey) => {
+    setSelectedColumnKeys((prev) =>
       prev.includes(col) ? prev.filter((c) => c !== col) : [...prev, col]
     );
   };
 
   const filteredRows = rows.filter((r) => selectedRows.includes(r));
-  const filteredColumns = columns.filter((c) => selectedColumns.includes(c));
-  const tableRef = React.useRef<HTMLTableElement>(null);
+  const filteredColumns = columns.filter((c) => selectedColumnKeys.includes(c.key));
+
   const totalRows = filteredRows.length;
   const totalCols = filteredColumns.length;
 
@@ -208,13 +141,6 @@ const TableMouvementDesBacs = ({
     }
   };
 
-  const bacTypeOptions = React.useMemo(() => {
-    if (bacTypesOptions && bacTypesOptions.length > 0) {
-      return ['—', ...bacTypesOptions.map((b) => b.name)];
-    }
-    return [...BAC_TYPES];
-  }, [bacTypesOptions]);
-
   React.useEffect(() => {
     const clickHandler = ({ target }: MouseEvent) => {
       if (rowDropdownRef.current && !rowDropdownRef.current.contains(target as Node) && !rowTriggerRef.current?.contains(target as Node)) setShowRowDropdown(false);
@@ -230,16 +156,15 @@ const TableMouvementDesBacs = ({
     'absolute left-0 top-full z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark';
 
   return (
-    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-6 overflow-hidden">
+    <div className="relative flex min-h-0 flex-1 flex-col gap-6 overflow-hidden">
       {loading && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-white/80 dark:bg-boxdark/80" aria-busy>
-          <span className="text-sm font-medium text-primary">Chargement…</span>
+        <div className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-white/80 dark:bg-boxdark/80">
+          <span className="text-sm font-medium text-bodydark2">Chargement…</span>
         </div>
       )}
       <div className="flex w-full flex-shrink-0 items-center gap-2">
         <div className="flex-1" />
         <div className="flex flex-wrap items-center justify-center gap-2">
-          {/* Créneaux */}
           <div className="relative" ref={rowDropdownRef}>
             <button type="button" ref={rowTriggerRef} onClick={() => setShowRowDropdown(!showRowDropdown)} className={filterTriggerClass}>
               Créneaux
@@ -266,28 +191,26 @@ const TableMouvementDesBacs = ({
               </div>
             )}
           </div>
-
-          {/* Colonnes */}
           <div className="relative" ref={columnDropdownRef}>
             <button type="button" ref={columnTriggerRef} onClick={() => setShowColumnDropdown(!showColumnDropdown)} className={filterTriggerClass}>
-              Produits
+              Colonnes
               <span className={showColumnDropdown ? 'rotate-180' : ''}>{CHEVRON_DOWN}</span>
             </button>
             {showColumnDropdown && (
-              <div className={`${dropdownPanelClass} min-w-[14rem] max-h-72`}>
+              <div className={`${dropdownPanelClass} min-w-[12rem]`}>
                 {columns.map((col) => {
-                  const isSelected = selectedColumns.includes(col);
+                  const isSelected = selectedColumnKeys.includes(col.key);
                   return (
                     <button
-                      key={col}
+                      key={col.key}
                       type="button"
-                      onClick={() => handleColumnToggle(col)}
+                      onClick={() => handleColumnToggle(col.key)}
                       className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${
                         isSelected ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'
                       }`}
                     >
                       {isSelected && CHECK}
-                      <span className={isSelected ? 'font-medium' : ''}>{col}</span>
+                      <span className={isSelected ? 'font-medium' : ''}>{col.title} — {col.subtitle}</span>
                     </button>
                   );
                 })}
@@ -296,10 +219,10 @@ const TableMouvementDesBacs = ({
           </div>
         </div>
         <div className="flex flex-1 justify-end items-center gap-2">
-          {showValidateButton && onValidate && (
+          {showValidateButton && (
             <button
               type="button"
-              onClick={() => onValidate()}
+              onClick={() => onValidate?.()}
               disabled={saving}
               className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-stroke/70 bg-white/90 px-3 text-green-600 transition hover:border-green-500 hover:bg-white hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-strokedark dark:bg-boxdark dark:text-green-400 dark:hover:border-green-500 dark:hover:bg-meta-4/80 dark:hover:text-green-300"
               aria-label="Valider et sauvegarder les modifications"
@@ -318,13 +241,11 @@ const TableMouvementDesBacs = ({
           </button>
         </div>
       </div>
-
-      {/* Tableau — directement sur la page, scrollbar collée sous le tableau */}
-      <div className="min-w-0 w-full overflow-auto self-start">
-        <div className="w-max">
+      <div className="inline-block max-h-[calc(100vh-14rem)] w-full max-w-full overflow-auto">
+        <div className="min-h-full w-max">
           <table
             ref={tableRef}
-            className="w-max min-w-full border-collapse table-auto"
+            className="min-w-full border-collapse table-auto"
             onKeyDown={handleTableKeyDown}
           >
             <thead>
@@ -335,82 +256,80 @@ const TableMouvementDesBacs = ({
                 />
                 {filteredColumns.map((col) => (
                   <th
-                    key={col}
-                    className="sticky top-0 z-10 min-w-[5.5rem] border-b border-r border-stroke/70 bg-primary py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark"
+                    key={col.key}
+                    className="sticky top-0 z-10 min-w-[6rem] border-b border-r border-stroke/70 bg-primary py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark"
                   >
-                    {col}
+                    {col.title}
                   </th>
                 ))}
               </tr>
               <tr>
                 <th
                   className="sticky left-0 z-20 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 border-t-0 border-l-0 bg-[#eff6ff] py-1 pl-2 pr-2 text-xs font-medium text-bodydark2 dark:border-strokedark dark:border-t-0 dark:border-l-0 dark:bg-[#273342] dark:text-bodydark1"
+                  aria-label=""
                 >
-                  Type de bac
+                  {''}
                 </th>
                 {filteredColumns.map((col) => (
                   <th
-                    key={col}
-                    className="sticky top-0 z-10 min-w-[6rem] border-b border-r border-stroke/70 bg-primary/95 py-1 px-1.5 dark:border-strokedark"
+                    key={col.key}
+                    className="sticky top-7 z-10 min-w-[6rem] border-b border-r border-stroke/70 bg-primary/95 py-1 px-1.5 text-center text-[11px] font-medium text-white/95 dark:border-strokedark"
                   >
-                    <select
-                      value={bacTypeByProduct[col] ?? bacTypeOptions[0]}
-                      disabled={!canEdit}
-                      onChange={(e) => handleBacTypeChange(col, e.target.value)}
-                      className="w-full rounded border-0 bg-white/95 py-1.5 pl-2 pr-6 text-left text-xs font-medium text-slate-800 shadow-sm outline-none focus:ring-2 focus:ring-white/50 disabled:cursor-default disabled:opacity-90 dark:bg-meta-4 dark:text-white dark:focus:ring-white/30"
-                      title={`Type de bac pour ${col}`}
-                    >
-                      {bacTypeOptions.map((bac) => (
-                        <option key={bac} value={bac}>
-                          {bac}
-                        </option>
-                      ))}
-                    </select>
+                    <span className="block truncate" title={col.subtitle}>
+                      {col.subtitle}
+                    </span>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filteredRows.map((row, rowIndex) => (
-                <tr
-                  key={row}
-                  className={`group border-b border-stroke/50 odd:bg-slate-100 even:bg-white transition-colors dark:border-strokedark/70 dark:odd:bg-meta-4/30 dark:even:bg-boxdark ${canEdit ? 'hover:bg-slate-200 dark:hover:bg-meta-4/50' : ''}`}
-                >
-                  <td className={`sticky left-0 z-10 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 bg-[#3c50e0] py-1 pl-2 pr-2 text-sm font-medium text-white dark:border-strokedark dark:bg-[#3c50e0] dark:text-white ${canEdit ? 'group-hover:bg-[#3c50e0]/90 dark:group-hover:bg-[#3c50e0]/90' : ''}`}>
-                    <span className="block truncate" title={row}>{row}</span>
-                  </td>
-                  {filteredColumns.map((col, colIndex) => {
-                    const value = (data[row] ?? {})[col] ?? '';
-                    const savedRow = lastSavedData?.find((r) => r.hour === row);
-                    const savedValue = savedRow?.values?.[col] ?? '';
-                    const isModified = savedRow != null && savedValue !== value;
-                    return (
-                      <td
-                        key={col}
-                        className={`min-w-[3.25rem] w-[3.25rem] border-r border-stroke/50 py-0 px-1 dark:border-strokedark/70 ${isModified ? 'bg-[#24303f] dark:bg-[#f1f5f9]' : 'bg-transparent'}`}
-                      >
-                        <input
-                          type="text"
-                          value={value}
-                          readOnly={!canEdit}
-                          data-cell="true"
-                          data-row={rowIndex}
-                          data-col={colIndex}
-                          onChange={(e) => handleChange(row, col, e.target.value)}
-                          className={`w-full py-1 pr-2 text-right text-sm font-medium outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 ${
-                            isModified
-                              ? 'bg-[#24303f] text-white placeholder:text-white/50 dark:bg-[#f1f5f9] dark:text-black dark:placeholder:text-black/50'
-                              : 'bg-transparent ' + (canEdit
-                                ? 'text-slate-800 focus:ring-2 focus:ring-primary/20 dark:text-slate-200'
-                                : 'cursor-default text-slate-800 dark:text-slate-200')
-                          }`}
-                          placeholder="—"
-                        />
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+              {filteredRows.map((rowHour, rowIndex) => {
+                const originalIndex = data.findIndex((r) => r.hour === rowHour);
+                const rowData = data.find((r) => r.hour === rowHour);
+                const values = rowData?.values ?? ({} as Record<GazColumnKey, string>);
+                return (
+                  <tr
+                    key={rowHour}
+                    className={`group border-b border-stroke/50 odd:bg-slate-100 even:bg-white transition-colors dark:border-strokedark/70 dark:odd:bg-meta-4/30 dark:even:bg-boxdark ${canEdit ? 'hover:bg-slate-200 dark:hover:bg-meta-4/50' : ''}`}
+                  >
+                    <td className={`sticky left-0 z-10 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 bg-[#3c50e0] py-1 pl-2 pr-2 text-sm font-medium text-white dark:border-strokedark dark:bg-[#3c50e0] dark:text-white ${canEdit ? 'group-hover:bg-[#3c50e0]/90 dark:group-hover:bg-[#3c50e0]/90' : ''}`}>
+                      <span className="block truncate" title={rowHour}>
+                        {rowHour}
+                      </span>
+                    </td>
+                    {filteredColumns.map((col, colIndex) => {
+                      const value = values[col.key] ?? '';
+                      const savedRow = lastSavedData != null && lastSavedData.length > 0 && originalIndex >= 0 ? lastSavedData[originalIndex] : null;
+                      const savedValue = savedRow?.values?.[col.key];
+                      const isModified = savedRow != null && savedValue !== value;
+                      return (
+                        <td
+                          key={col.key}
+                          className={`min-w-[4rem] w-[4rem] border-r border-stroke/50 py-0 px-1 dark:border-strokedark/70 ${isModified ? 'bg-[#24303f] dark:bg-[#f1f5f9]' : 'bg-transparent'}`}
+                        >
+                          <input
+                            type="text"
+                            value={value}
+                            readOnly={!canEdit}
+                            onChange={(e) => handleChange(rowHour, col.key, e.target.value)}
+                            data-cell="true"
+                            data-row={rowIndex}
+                            data-col={colIndex}
+                            className={`w-full py-1 pr-2 text-right text-sm font-medium outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 ${
+                              isModified
+                                ? 'bg-[#24303f] text-white placeholder:text-white/50 dark:bg-[#f1f5f9] dark:text-black dark:placeholder:text-black/50'
+                                : 'bg-transparent ' + (canEdit
+                                  ? 'text-slate-800 focus:ring-2 focus:ring-primary/20 dark:text-slate-200'
+                                  : 'cursor-default text-slate-800 dark:text-slate-200')
+                            }`}
+                            placeholder="—"
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -419,4 +338,4 @@ const TableMouvementDesBacs = ({
   );
 };
 
-export default TableMouvementDesBacs;
+export default TableGaz;

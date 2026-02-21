@@ -54,10 +54,12 @@ export type HourKey = (typeof hours)[number];
 
 export const hourLabels: Record<HourKey, string> = { h7: '7h', h15: '15h', h23: '23h' };
 
-const measureNames = [
+/** Liste des mesures (ordre affiché tableau / graphique). Exportée pour initialiser le sélecteur. */
+export const ANALYSES_MEASURE_NAMES = [
   'densité à 15°', 'tv', 'viscosité', 'flash', 'pi', '5%', '10%', '20%', '50%',
   '90%', '95%', 'pf', '%dist', 'résidu', 'congel', 'p° trouble', 'couleur', 'cétane',
 ];
+const measureNames = ANALYSES_MEASURE_NAMES;
 
 function createEmptyProductHours(): ProductHours {
   return { h7: '', h15: '', h23: '' };

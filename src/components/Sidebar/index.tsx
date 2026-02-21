@@ -208,11 +208,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
               {/* <!-- Menu Item Analyses du laboratoire --> */}
               <li>
                 <NavLink
-                  to="/analyses-laboratoire"
+                  to="/tableaux"
                   className={`group relative flex items-center rounded-sm py-1.5 text-xs font-semibold text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
                     sidebarExpanded ? 'gap-2 px-3' : 'justify-center px-2'
                   } ${
-                    pathname.includes('analyses-laboratoire') &&
+                    pathname.includes('tableaux') &&
                     'bg-graydark dark:bg-meta-4'
                   }`}
                 >
@@ -265,11 +265,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
               {/* <!-- Menu Item Réformateur catalytique --> */}
               <li>
                 <NavLink
-                  to="/reformateur-catalytique"
+                  to="/tableaux"
                   className={`group relative flex items-center rounded-sm py-1.5 text-xs font-semibold text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
                     sidebarExpanded ? 'gap-2 px-3' : 'justify-center px-2'
                   } ${
-                    pathname.includes('reformateur-catalytique') &&
+                    pathname.includes('tableaux') &&
                     'bg-graydark dark:bg-meta-4'
                   }`}
                 >
@@ -314,11 +314,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
               {/* <!-- Menu Item Mouvement des bacs --> */}
               <li>
                 <NavLink
-                  to="/mouvement-des-bacs"
+                  to="/tableaux"
                   className={`group relative flex items-center rounded-sm py-1.5 text-xs font-semibold text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
                     sidebarExpanded ? 'gap-2 px-3' : 'justify-center px-2'
                   } ${
-                    pathname.includes('mouvement-des-bacs') &&
+                    pathname.includes('tableaux') &&
                     'bg-graydark dark:bg-meta-4'
                   }`}
                 >
@@ -364,14 +364,14 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
               </li>
               {/* <!-- Menu Item Mouvement des bacs --> */}
 
-              {/* <!-- Menu Item Production : valeur/electricité --> */}
+              {/* <!-- Menu Item Production --> */}
               <li>
                 <NavLink
-                  to="/production-valeur-electricite"
+                  to="/tableaux"
                   className={`group relative flex items-center rounded-sm py-1.5 text-xs font-semibold text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
                     sidebarExpanded ? 'gap-2 px-3' : 'justify-center px-2'
                   } ${
-                    pathname.includes('production-valeur-electricite') &&
+                    pathname.includes('tableaux') &&
                     'bg-graydark dark:bg-meta-4'
                   }`}
                 >
@@ -407,20 +407,53 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                   <span className={`transition-opacity duration-300 ${
                     sidebarExpanded ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'
                   }`}>
-                    valeur/electricité
+                    Production
                   </span>
                 </NavLink>
               </li>
-              {/* <!-- Menu Item Production : valeur/electricité --> */}
+              {/* <!-- Menu Item Production --> */}
+
+              {/* <!-- Menu Item Gaz --> */}
+              <li>
+                <NavLink
+                  to="/tableaux"
+                  className={`group relative flex items-center rounded-sm py-1.5 text-xs font-semibold text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
+                    sidebarExpanded ? 'gap-2 px-3' : 'justify-center px-2'
+                  } ${
+                    pathname.includes('tableaux') &&
+                    'bg-graydark dark:bg-meta-4'
+                  }`}
+                >
+                  <svg
+                    className="fill-current"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 18 18"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M9 1.5L4.5 6H7.5V16.5H10.5V6H13.5L9 1.5Z"
+                      fill=""
+                    />
+                  </svg>
+                  <span className={`transition-opacity duration-300 ${
+                    sidebarExpanded ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'
+                  }`}>
+                    Gaz
+                  </span>
+                </NavLink>
+              </li>
+              {/* <!-- Menu Item Gaz --> */}
 
               {/* <!-- Menu Item Compresseur K 245 --> */}
               <li>
                 <NavLink
-                  to="/compresseur-k245"
+                  to="/tableaux"
                   className={`group relative flex items-center rounded-sm py-1.5 text-xs font-semibold text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
                     sidebarExpanded ? 'gap-2 px-3' : 'justify-center px-2'
                   } ${
-                    pathname.includes('compresseur-k245') &&
+                    (pathname === '/tableaux' || pathname.startsWith('/tableaux/')) &&
                     'bg-graydark dark:bg-meta-4'
                   }`}
                 >
@@ -481,11 +514,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
               {/* <!-- Menu Item Compresseur k244 --> */}
               <li>
                 <NavLink
-                  to="/compresseur-k244"
+                  to="/tableaux"
                   className={`group relative flex items-center rounded-sm py-1.5 text-xs font-semibold text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
                     sidebarExpanded ? 'gap-2 px-3' : 'justify-center px-2'
                   } ${
-                    pathname.includes('compresseur-k244') &&
+                    (pathname === '/tableaux' || pathname.startsWith('/tableaux/')) &&
                     'bg-graydark dark:bg-meta-4'
                   }`}
                 >
@@ -546,11 +579,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
               {/* <!-- Menu Item ATM/MEROX & PRE-FLASH --> */}
               <li>
                 <NavLink
-                  to="/atm-merox-preflash"
+                  to="/tableaux"
                   className={`group relative flex items-center rounded-sm py-1.5 text-xs font-semibold text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
                     sidebarExpanded ? 'gap-2 px-3' : 'justify-center px-2'
                   } ${
-                    pathname.includes('atm-merox-preflash') &&
+                    (pathname === '/tableaux' || pathname.startsWith('/tableaux/')) &&
                     'bg-graydark dark:bg-meta-4'
                   }`}
                 >
@@ -574,7 +607,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                   <span className={`transition-opacity duration-300 ${
                     sidebarExpanded ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'
                   }`}>
-                    ATM/MEROX & PRE-FLASH
+                    Atm/merox & pré flash
                   </span>
                 </NavLink>
               </li>

@@ -1,64 +1,85 @@
 import React from 'react';
-import { NavLink, Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import LogoIcon from '../../images/logo/logo-icon.svg';
 import DarkModeSwitcher from '../Header/DarkModeSwitcher';
 import DropdownUser from '../Header/DropdownUser';
 
 const SecondaryNavbar = () => {
-  const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `inline-flex items-center rounded-md px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap underline underline-offset-2 decoration-gray-400 dark:decoration-white ${
-      isActive
-        ? 'bg-primary text-white dark:bg-primary dark:text-white'
-        : 'text-gray-700 hover:bg-gray-100 hover:text-black dark:text-bodydark1 dark:hover:bg-meta-4 dark:hover:text-white'
-    }`;
-
-  const dashboardLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors whitespace-nowrap border-2 ${
-      isActive
-        ? 'bg-primary border-primary text-white dark:bg-primary dark:border-primary dark:text-white'
-        : 'border-primary bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary dark:border-primary dark:bg-primary/10 dark:text-white dark:hover:bg-primary/20'
-    }`;
+  const { pathname } = useLocation();
+  const isDashboardPage = pathname === '/';
+  const isSaisiePage = pathname === '/saisie' || pathname.startsWith('/saisie/');
+  const isTableauxPage = pathname === '/tableaux' || pathname.startsWith('/tableaux/');
+  const isGraphiquesPage = pathname.startsWith('/graphique');
 
   return (
-    <nav
-      className="flex min-h-[52px] w-full flex-shrink-0 items-center border-stroke bg-white dark:bg-boxdark dark:border-strokedark"
-    >
+    <nav className="flex min-h-[52px] w-full flex-shrink-0 items-center border-stroke bg-white dark:bg-boxdark dark:border-strokedark">
       <div className="flex w-full items-center px-4 py-2 md:px-6 2xl:px-11">
         <Link className="flex h-8 w-8 flex-shrink-0 items-center justify-center" to="/" aria-label="Accueil">
           <img src={LogoIcon} alt="Logo" className="h-8 w-8" />
         </Link>
         <div className="flex flex-1 items-center justify-center overflow-x-auto no-scrollbar">
           <ul className="flex items-center gap-1">
-          <li className="shrink-0 mr-2 pr-2 border-r border-stroke dark:border-strokedark">
-            <NavLink to="/" className={dashboardLinkClass}>Saisie</NavLink>
-          </li>
-          <li className="shrink-0">
-            <NavLink to="/analyses-laboratoire" className={linkClass}>Analyses du laboratoire</NavLink>
-          </li>
-          <li className="shrink-0">
-            <NavLink to="/reformateur-catalytique" className={linkClass}>Réformateur catalytique</NavLink>
-          </li>
-          <li className="shrink-0">
-            <NavLink to="/mouvement-des-bacs" className={linkClass}>Mouvement des bacs</NavLink>
-          </li>
-          <li className="shrink-0">
-            <NavLink to="/production-valeur-electricite" className={linkClass}>valeur/electricité</NavLink>
-          </li>
-          <li className="shrink-0">
-            <NavLink to="/compresseur-k245" className={linkClass}>Compresseur K 245</NavLink>
-          </li>
-          <li className="shrink-0">
-            <NavLink to="/compresseur-k244" className={linkClass}>Compresseur K 244</NavLink>
-          </li>
-          <li className="shrink-0">
-            <NavLink to="/atm-merox-preflash" className={linkClass}>ATM/MEROX & PRE-FLASH</NavLink>
-          </li>
-          <li className="shrink-0 ml-2 pl-2 border-l border-stroke dark:border-strokedark">
-            <NavLink to="/tableau-de-bord" className={dashboardLinkClass}>Tableau de bord</NavLink>
-          </li>
-        </ul>
+            <li className="shrink-0 mr-2 pr-2 border-r border-stroke dark:border-strokedark">
+              <Link
+                to="/"
+                className={`inline-flex items-center gap-1 px-3 py-2 text-sm font-semibold transition-colors whitespace-nowrap rounded ${
+                  isDashboardPage
+                    ? 'bg-primary text-white dark:bg-primary dark:text-white'
+                    : 'text-primary hover:text-primary/90 dark:text-white dark:hover:text-white/90'
+                }`}
+              >
+                Dashboard
+              </Link>
+            </li>
+            <li className="shrink-0 mr-2 pr-2 border-r border-stroke dark:border-strokedark">
+              <Link
+                to="/saisie/atm-merox-preflash"
+                className={`inline-flex items-center gap-1 px-3 py-2 text-sm font-semibold transition-colors whitespace-nowrap rounded ${
+                  isSaisiePage
+                    ? 'bg-primary text-white dark:bg-primary dark:text-white'
+                    : 'text-primary hover:text-primary/90 dark:text-white dark:hover:text-white/90'
+                }`}
+              >
+                Saisie
+              </Link>
+            </li>
+            <li className="shrink-0 relative">
+              <Link
+                to="/tableaux?tableau=Analyses%20du%20laboratoire"
+                className={`inline-flex items-center gap-1 px-3 py-2 text-sm font-semibold transition-colors whitespace-nowrap rounded ${
+                  isTableauxPage
+                    ? 'bg-primary text-white dark:bg-primary dark:text-white'
+                    : 'text-primary hover:text-primary/90 dark:text-white dark:hover:text-white/90'
+                }`}
+              >
+                Tableau
+              </Link>
+            </li>
+            <li className="shrink-0 ml-2 pl-2 border-l border-stroke dark:border-strokedark">
+              <Link
+                to="/graphique"
+                className={`inline-flex items-center gap-1 px-3 py-2 text-sm font-semibold transition-colors whitespace-nowrap rounded ${
+                  isGraphiquesPage
+                    ? 'bg-primary text-white dark:bg-primary dark:text-white'
+                    : 'text-primary hover:text-primary/90 dark:text-white dark:hover:text-white/90'
+                }`}
+              >
+                Graphique
+              </Link>
+            </li>
+          </ul>
         </div>
         <div className="relative flex flex-shrink-0 items-center gap-3 overflow-visible">
+          <Link
+            to="/settings"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-primary dark:text-bodydark transition hover:bg-stroke hover:text-primary dark:hover:bg-meta-4/50 dark:hover:text-white"
+            aria-label="Paramètres"
+          >
+            <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </Link>
           <DarkModeSwitcher />
           <DropdownUser />
         </div>
