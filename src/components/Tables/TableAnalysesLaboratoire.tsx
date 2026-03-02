@@ -357,7 +357,24 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
         </div>
       </div>
 
-      {/* Un seul conteneur de scroll : quand hideEmptyColumns, w-max + mx-auto pour que la scrollbar verticale reste collée au tableau comme l'horizontale */}
+      {hideEmptyColumns && visibleProducts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-5 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20">
+            <svg className="h-8 w-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6M3 21h18M3 10l9-7 9 7M5 21V10" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-base font-semibold text-slate-700 dark:text-slate-200">Aucune analyse disponible</p>
+            <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
+              Aucune donnée n'a été enregistrée pour le{' '}
+              <span className="font-medium text-primary">
+                {new Date(selectedDate + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </span>
+            </p>
+          </div>
+        </div>
+      ) : (
       <div className={`min-w-0 ${allRowsVisible ? 'overflow-x-auto' : 'max-h-[calc(100vh-14rem)] overflow-auto'}${hideEmptyColumns ? ' w-max mx-auto' : ''}`}>
         <div className="min-h-full w-max">
           <table
@@ -465,6 +482,7 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
         </table>
         </div>
       </div>
+      )}
     </div>
   );
 };

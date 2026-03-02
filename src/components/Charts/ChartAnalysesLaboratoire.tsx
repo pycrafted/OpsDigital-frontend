@@ -1454,15 +1454,15 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
       </div>
       {isDay && (
         <div className="mt-3 flex flex-wrap justify-end gap-2">
-          <div className="flex items-center gap-2 rounded border border-[#EA580C] bg-white px-3 py-1 shadow-sm dark:bg-[#EA580C]/20">
+          <div className="flex items-center gap-2 rounded border border-[#EA580C] bg-white px-3 py-1 shadow-sm dark:bg-[#1d2a38] dark:border-white">
             <span className="h-2.5 w-2.5 rounded-full bg-[#EA580C] shadow-sm" />
             <span className="text-xs font-semibold tracking-wide text-[#EA580C]">7h</span>
           </div>
-          <div className="flex items-center gap-2 rounded border border-[#059669] bg-white px-3 py-1 shadow-sm dark:bg-[#059669]/20">
+          <div className="flex items-center gap-2 rounded border border-[#059669] bg-white px-3 py-1 shadow-sm dark:bg-[#1d2a38] dark:border-white">
             <span className="h-2.5 w-2.5 rounded-full bg-[#059669] shadow-sm" />
             <span className="text-xs font-semibold tracking-wide text-[#059669]">15h</span>
           </div>
-          <div className="flex items-center gap-2 rounded border border-[#DC2626] bg-white px-3 py-1 shadow-sm dark:bg-[#DC2626]/20">
+          <div className="flex items-center gap-2 rounded border border-[#DC2626] bg-white px-3 py-1 shadow-sm dark:bg-[#1d2a38] dark:border-white">
             <span className="h-2.5 w-2.5 rounded-full bg-[#DC2626] shadow-sm" />
             <span className="text-xs font-semibold tracking-wide text-[#DC2626]">23h</span>
           </div>
@@ -1470,11 +1470,11 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
       )}
       {(isWeek || duration === 'month') && (
         <div className="mt-3 flex flex-wrap justify-end gap-2">
-          <div className="flex items-center gap-2 rounded border border-[#3c50e0] bg-white px-3 py-1 shadow-sm dark:bg-[#3c50e0]/20">
+          <div className="flex items-center gap-2 rounded border border-[#3c50e0] bg-white px-3 py-1 shadow-sm dark:bg-[#1d2a38] dark:border-white">
             <span className="h-2.5 w-2.5 rounded-full bg-[#3c50e0] shadow-sm" />
             <span className="text-xs font-semibold tracking-wide text-[#3c50e0]">Conforme</span>
           </div>
-          <div className="flex items-center gap-2 rounded border border-[#DC2626] bg-white px-3 py-1 shadow-sm dark:bg-[#DC2626]/20">
+          <div className="flex items-center gap-2 rounded border border-[#DC2626] bg-white px-3 py-1 shadow-sm dark:bg-[#1d2a38] dark:border-white">
             <span className="h-2.5 w-2.5 rounded-full bg-[#DC2626] shadow-sm" />
             <span className="text-xs font-semibold tracking-wide text-[#DC2626]">Non conforme</span>
           </div>

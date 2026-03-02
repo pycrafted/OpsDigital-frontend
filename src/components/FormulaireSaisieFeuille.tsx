@@ -829,7 +829,7 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
     <>
       {externalDate && !hideSeparator && (
           <div className="pb-2">
-            <hr className="w-full border-t-2 border-white" />
+            <hr className="mx-6 border-t-2 border-[#3c50e0] dark:border-white" />
           </div>
         )}
       {/* En-tête : directement sur la page */}
@@ -936,7 +936,7 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
                 >
                   <label
                     htmlFor={key}
-                    className="sm:w-44 shrink-0 text-sm font-medium text-body dark:text-bodydark1"
+                    className="sm:w-44 shrink-0 text-sm font-medium text-[#3c50e0] dark:text-white"
                   >
                     {label}
                   </label>

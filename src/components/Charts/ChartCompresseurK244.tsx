@@ -997,7 +997,7 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
           {Object.entries(HOUR_COLORS).map(([hkey, color]) => {
             const label = hkey.replace(/^h(\d+)$/, '$1h');
             return (
-              <div key={hkey} className="flex items-center gap-2 rounded border bg-white px-3 py-1 shadow-sm dark:bg-transparent" style={{ borderColor: color, ...(colorMode === 'dark' ? { backgroundColor: `${color}33` } : {}) }}>
+              <div key={hkey} className="flex items-center gap-2 rounded border bg-white px-3 py-1 shadow-sm dark:bg-[#1d2a38]" style={{ borderColor: colorMode === 'dark' ? 'white' : color }}>
                 <span className="h-2.5 w-2.5 rounded-full shadow-sm" style={{ backgroundColor: color }} />
                 <span className="text-xs font-semibold tracking-wide" style={{ color }}>{label}</span>
               </div>
