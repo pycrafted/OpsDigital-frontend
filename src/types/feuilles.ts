@@ -16,60 +16,15 @@ export interface FeuilleConfig {
   fields: ChampSaisie[];
 }
 
-const ANALYSES_PROPERTIES = [
-  'densité à 15°', 'tv', 'viscosité', 'flash', 'pi', '5%', '10%', '20%', '50%',
-  '90%', '95%', 'pf', '%dist', 'résidu', 'congel', 'p° trouble',
-];
-const ANALYSES_PRODUCTS = [
-  'essenceLeger', 'essenceTotale', 'naphta', 'kerosene', 'goAtm', 'goSv', 'goTotal',
-  'goDeTete', 'goLourd', 'residuSv', 'residuAtm', 'reformat', 'g201', 'g202',
-];
+/** Ordre des catégories pour le formulaire Compresseur K 244 (choix alignés). */
+export const COMPRESSEUR_K244_CATEGORY_OPTIONS = ['huile', 'eau', 'hydrogene', 'azote', 'moteur k244'] as const;
 
-const analysesFields: ChampSaisie[] = [];
-ANALYSES_PROPERTIES.forEach((prop) => {
-  ANALYSES_PRODUCTS.forEach((product) => {
-    analysesFields.push({
-      category: prop,
-      label: product,
-      key: `${prop}_${product}`,
-    });
-  });
-});
-
-const buildCategoryFields = (categories: { category: string; subRows: string[] }[]): ChampSaisie[] =>
-  categories.flatMap((cat) =>
-    cat.subRows.map((sub) => ({
-      category: cat.category || 'Divers',
-      label: sub || '(sans nom)',
-      key: `${cat.category || '__empty__'}_${sub}`,
-    }))
-  );
-
-const REFORMATEUR_CATEGORIES = [
-  { category: 'prétraitement', subRows: ['20FI 011 Charge HDT', '20FR 003 H --> D203', '20TI 004 Chauffe D203', 'Taux couverture D203', '20FR 009 Strip c201', '20PDI 044 Δ P D203', 'Niveau D214 20LI 007'] },
-  { category: 'réactionnelle', subRows: ['20FR 002 Charge N Réforming', '20FR 035 Débit Gaz recv', '20TC 002 Transfert F241', '20PDI 106 Δ T D204', '20TC 001 Transfert F201', '20TDI 107 Δ T D205', '20TC 092 Transfert F202', '20TDI 108  Δ T D206', '20LI 003 Niv D241', 'Densité Shilling', '%H2', 'Taux H2/HC', 'NO Réformat', 'débit ccl4', '20 TC 105 Transfert F 203', 'niveau d213'] },
-];
-
-/** Champs saisis manuellement pour Réformateur catalytique ; le reste provient d'autres sources (ex. ip23). */
 const REFORMATEUR_SAISIE_FIELDS: ChampSaisie[] = [
   { category: 'réactionnelle', label: 'Densité Shilling', key: 'réactionnelle_Densité Shilling' },
   { category: 'réactionnelle', label: 'débit ccl4', key: 'réactionnelle_débit ccl4' },
   { category: 'réactionnelle', label: 'niveau d213', key: 'réactionnelle_niveau d213' },
 ];
 
-/** Ordre des catégories pour le formulaire Compresseur K 244 (choix alignés). */
-export const COMPRESSEUR_K244_CATEGORY_OPTIONS = ['huile', 'eau', 'hydrogene', 'azote', 'moteur k244'] as const;
-
-const COMPRESSEUR_K244_CATEGORIES = [
-  { category: 'huile', subRows: ['pression hrefp', 'pi 104 h ph graissage', 'press diff filtres pdi 101', 't°h ref pompe'] },
-  { category: 'eau', subRows: ['t° sortie certp', 't°eau refrig sud', 't°eau refrig nord'] },
-  { category: 'hydrogene', subRows: ['pi 101 press asp gaz', 'pi 102 press asp gaz', 't° 102 ref ligne nord', 't° 103 ref ligne sud', 't° 101 t° aspirat°', 't° 104 temp palier carter', 'temp palier volant ti 105', '%charge compress'] },
-  { category: 'azote', subRows: ['pr n2 av détendeur', 'pr n2 ap détendeur', 'débit n2 rotametre', 'pression cadre n2'] },
-  { category: 'air', subRows: ['pr air demarrage', 'pr --> clapets'] },
-  { category: 'moteur k244', subRows: ['vitesse', 'pr-h-m', 't°-h-m', 't° eau Mot', 'Pr Air turb gauche', 'Pr Air turb droite', 't° fumées vent turb echap apres turbo', 't° echap gauche', 't° echap droite'] },
-];
-
-/** Champs saisis manuellement pour Compresseur K 244 ; le reste provient d'autres sources. */
 const COMPRESSEUR_K244_SAISIE_FIELDS: ChampSaisie[] = [
   { category: 'huile', label: 'pression hrefp', key: 'huile_pression hrefp' },
   { category: 'huile', label: 'pi 104 h ph graissage', key: 'huile_pi 104 h ph graissage' },
@@ -93,16 +48,6 @@ const COMPRESSEUR_K244_SAISIE_FIELDS: ChampSaisie[] = [
   { category: 'moteur k244', label: 't° echap droite', key: 'moteur k244_t° echap droite' },
 ];
 
-const COMPRESSEUR_K245_CATEGORIES = [
-  { category: 'huile', subRows: ['pression hrefp', 'pi 104 h ph graissage', 'press diff filtres pdi 101', 't°h ref pompe'] },
-  { category: 'eau', subRows: ['t° sortie certp', 't°eau refrig sud', 't°eau refrig nord'] },
-  { category: 'hydrogene', subRows: ['pi 101 press asp gaz', 'pi 102 press asp gaz', 't° 102 ref ligne nord', 't° 103 ref ligne sud', 't° 101 t° aspirat°', 't° 104 temp palier carter', 'temp palier volant ti 105', '%charge compress'] },
-  { category: 'azote', subRows: ['pr n2 av détendeur', 'pr n2 ap détendeur', 'débit n2 rotametre', 'pression cadre n2'] },
-  { category: 'air', subRows: ['pr air demarrage', 'pr --> clapets'] },
-  { category: 'moteur k245', subRows: ['vitesse', 'pr-h-m', 't°-h-m', 't° eau Mot', 'Pr Air turb gauche', 'Pr Air turb droite', 't° fumées vent turb echap apres turbo', 't° echap gauche', 't° echap droite'] },
-];
-
-/** Champs saisis manuellement pour Compresseur K 245 ; le reste provient d'autres sources. */
 const COMPRESSEUR_K245_SAISIE_FIELDS: ChampSaisie[] = [
   { category: 'relevé', label: 'n° cadre', key: 'relevé_n° cadre' },
   { category: 'relevé', label: 'p cadre', key: 'relevé_p cadre' },
@@ -114,25 +59,6 @@ const COMPRESSEUR_K245_SAISIE_FIELDS: ChampSaisie[] = [
   { category: 'relevé', label: 'cote d 202', key: 'relevé_cote d 202' },
 ];
 
-const ATM_MEROX_CATEGORIES = [
-  { category: 'Charge brut', subRows: ['Pres° Entrée UNITE', '17 FT 001 Débit charge'] },
-  { category: "I° Train Brut", subRows: ['10 PC 022 Préssion D120', '10 TI 062 T° Entrée D120'] },
-  { category: 'D120', subRows: ['10 KDI 029 Niv Eau D120'] },
-  { category: 'FOUR F171', subRows: ['17 TC 025 Transfert F 171', '17 TT 631 T° FUMEE F 171'] },
-  { category: 'FOUR F141', subRows: ['10 TI 055 T° Fumée HAUTRAD F 141', '10 TI 040 T° Transf F 141'] },
-  { category: 'FOUR F 101', subRows: ['10 TI 086 T° Entrée Brut F 101', '10 TI 001 T° Transf F101', '10 FI 002 Fumée Rad F101', '10 FI 027 A passe A', '10 FI 027 B passe B', '10 FI 027 C passe C', '10 FI 027 D passe D'] },
-  { category: 'C101', subRows: ['10 PI 001 press Tete C101', '10 FI 002 Temp Tete C101', 'Amime Neut --> C101', 'Amime Film --> C101', 'PH EAU D 102'] },
-  { category: 'C105', subRows: ['10 PI 002 Press C105', 'Amime Film --> C105'] },
-  { category: 'C 106', subRows: ['10 PI 053 Press C106'] },
-  { category: 'C114', subRows: ['PH EAU D 141'] },
-  { category: 'C141', subRows: ['10 PI 008 Vide Z Flash', 'Amime Neut --> C141', 'Amime Film --> C141'] },
-  { category: 'C171', subRows: ['Amime Film --> C171', 'Amime Neut --> C171', '17 PC 022 Press Tete C171', '17 TC 017 Temp Tete C171', 'PH EAU D 171'] },
-  { category: 'MEROX', subRows: ['80 PI 006 Press Sortie MEROX', '% Pompe Sode 3°B', '80 FI 002 DEBIT CHRGE MEROX'] },
-  { category: 'DOPE', subRows: ['Injection Dope GO', 'Injection Dope FO'] },
-  { category: '', subRows: ['DEBIT H20 G122'] },
-];
-
-/** Champs saisis manuellement pour ATM/MEROX & Pre-Flash ; le reste est fourni par ip23 via API */
 const ATM_MEROX_SAISIE_FIELDS: ChampSaisie[] = [
   { category: 'Charge brut', label: 'Pres° Entrée UNITE', key: 'Charge brut_Pres° Entrée UNITE' },
   { category: 'C101', label: 'Amime Neut --> C101', key: 'C101_Amime Neut --> C101' },
@@ -147,18 +73,6 @@ const ATM_MEROX_SAISIE_FIELDS: ChampSaisie[] = [
   { category: 'DOPE', label: 'Injection Dope FO', key: 'DOPE_Injection Dope FO' },
 ];
 
-const PRODUCTION_ELECTRICITE_CATEGORIES = [
-  { category: 'FO D349', subRows: ['30LJ002', '30TC002'] },
-  { category: 'D362', subRows: ['37 LI 018 NIVEAU  D362'] },
-  { category: 'H 341', subRows: ['30F1012', '30A1002 O2 Fumées Chem'] },
-  { category: 'Autres producteurs', subRows: ['20FI1052 Débit Vap D242', '10FI1052 Débit Vap E143'] },
-  { category: 'H302', subRows: ['30FI005 Débit vap H 302', '30QI004 O2 Fumées Chen'] },
-  { category: 'eau traitée', subRows: ['Débit Permo A', 'Débit Permo B', 'Niveau T341'] },
-  { category: 'AIR/EAU REF', subRows: ['Press AIR instrum 30 PI 040', 'Lancement 30PI 068', 'Débit eau refroidissement 30 FI 036', 'T° eau circulation retour 30 TI 014'] },
-  { category: 'production electrique', subRows: ['', 'Charge', 'Intensité', 'Fréquence', 'S1', 'S2', 'S3', 'S4', 'S5', 'J351', 'J352', 'J355'] },
-];
-
-/** Champs saisis manuellement pour Production / Valeur / Électricité ; le reste provient d'autres sources. */
 const PRODUCTION_ELECTRICITE_SAISIE_FIELDS: ChampSaisie[] = [
   { category: 'eau traitée', label: 'Débit Permo A', key: 'eau traitée_Débit Permo A' },
   { category: 'eau traitée', label: 'Débit Permo B', key: 'eau traitée_Débit Permo B' },
@@ -175,7 +89,6 @@ const PRODUCTION_ELECTRICITE_SAISIE_FIELDS: ChampSaisie[] = [
   { category: 'production electrique', label: 'J355', key: 'production electrique_J355' },
 ];
 
-/** Champs saisis manuellement pour Gaz (tableau Gaz). */
 const GAZ_SAISIE_FIELDS: ChampSaisie[] = [
   { category: 'Gaz', label: 'C 105 (LPG C 105)', key: 'gaz_c105' },
   { category: 'Gaz', label: 'C 261 (LPG C 261)', key: 'gaz_c261' },

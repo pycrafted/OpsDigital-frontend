@@ -1,7 +1,9 @@
 import { ApexOptions } from 'apexcharts';
 import React, { useEffect, useMemo, useState } from 'react';
 import ReactApexChart from 'react-apexcharts';
+import { useAnalysesLaboBounds } from '../../context/AnalysesLaboBoundsContext';
 import {
+  ANALYSES_MEASURE_NAMES,
   AnalyseRow,
   hourLabels,
   hours,
@@ -62,7 +64,7 @@ function formatDateDDMMYYYY(day: number, month: number, year: number): string {
 const hourSuffixesAnalyses = [hourLabels.h7, hourLabels.h15, hourLabels.h23] as const;
 
 /** Données vides (sans exemple) : 7 jours × 3 relevés, valeurs à 0. */
-function getEmptyWeekData(productLabel: string): { categories: string[]; series: { name: string; data: number[] }[] } {
+function getEmptyWeekData(productLabel: string): { categories: string[]; series: { name: string; data: number[] }[]; outOfBoundsIndices: number[] } {
   const categories: string[] = [];
   for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
     const dayLabel = WEEK_DAY_LABELS[dayIndex];
@@ -70,11 +72,11 @@ function getEmptyWeekData(productLabel: string): { categories: string[]; series:
       categories.push(`${dayLabel} ${h}`);
     });
   }
-  return { categories, series: [{ name: productLabel, data: categories.map(() => 0) }] };
+  return { categories, series: [{ name: productLabel, data: categories.map(() => 0) }], outOfBoundsIndices: [] };
 }
 
 /** Données vides pour la vue Mois : N jours × 3 relevés, valeurs à 0. */
-function getEmptyMonthData(selectedMonth: string | undefined, productLabel: string): { categories: string[]; series: { name: string; data: number[] }[] } {
+function getEmptyMonthData(selectedMonth: string | undefined, productLabel: string): { categories: string[]; series: { name: string; data: number[] }[]; outOfBoundsIndices: number[] } {
   let year: number;
   let month: number;
   if (selectedMonth) {
@@ -96,7 +98,7 @@ function getEmptyMonthData(selectedMonth: string | undefined, productLabel: stri
       categories.push(`${dateStr} ${h}`);
     });
   }
-  return { categories, series: [{ name: productLabel, data: categories.map(() => 0) }] };
+  return { categories, series: [{ name: productLabel, data: categories.map(() => 0) }], outOfBoundsIndices: [] };
 }
 
 /** Retourne l'année et le numéro de trimestre (1-4) à partir de "YYYY-Qn" */
@@ -137,7 +139,7 @@ function parseSemesterString(semesterStr: string): { year: number; semester: num
 }
 
 /** Données vides pour la vue Semestre : 6 mois de catégories, valeurs à 0. */
-function getEmptySemesterData(selectedSemester: string | undefined, productLabel: string): { categories: string[]; series: { name: string; data: number[] }[] } {
+function getEmptySemesterData(selectedSemester: string | undefined, productLabel: string): { categories: string[]; series: { name: string; data: number[] }[]; outOfBoundsIndices: number[] } {
   const parsed = selectedSemester ? parseSemesterString(selectedSemester) : null;
   let year: number;
   let startMonth: number;
@@ -156,7 +158,7 @@ function getEmptySemesterData(selectedSemester: string | undefined, productLabel
     const monthResult = getEmptyMonthData(monthStr, productLabel);
     allCategories.push(...monthResult.categories);
   }
-  return { categories: allCategories, series: [{ name: productLabel, data: allCategories.map(() => 0) }] };
+  return { categories: allCategories, series: [{ name: productLabel, data: allCategories.map(() => 0) }], outOfBoundsIndices: [] };
 }
 
 function formatSemesterLabel(ys: string): string {
@@ -168,7 +170,7 @@ function formatSemesterLabel(ys: string): string {
 }
 
 /** Données vides pour la vue Année : 12 mois de catégories, valeurs à 0. */
-function getEmptyYearData(selectedYear: string | undefined, productLabel: string): { categories: string[]; series: { name: string; data: number[] }[] } {
+function getEmptyYearData(selectedYear: string | undefined, productLabel: string): { categories: string[]; series: { name: string; data: number[] }[]; outOfBoundsIndices: number[] } {
   const year = selectedYear && Number.isFinite(parseInt(selectedYear, 10)) ? parseInt(selectedYear, 10) : new Date().getFullYear();
   const allCategories: string[] = [];
   for (let m = 0; m < 12; m++) {
@@ -176,7 +178,7 @@ function getEmptyYearData(selectedYear: string | undefined, productLabel: string
     const monthResult = getEmptyMonthData(monthStr, productLabel);
     allCategories.push(...monthResult.categories);
   }
-  return { categories: allCategories, series: [{ name: productLabel, data: allCategories.map(() => 0) }] };
+  return { categories: allCategories, series: [{ name: productLabel, data: allCategories.map(() => 0) }], outOfBoundsIndices: [] };
 }
 
 function formatYearLabel(y: string): string {
@@ -224,6 +226,12 @@ export interface YearAnalysesData {
 export interface ChartAnalysesLaboratoireProps {
   data: AnalyseRow[];
   embedded?: boolean;
+  /** Contenu affiché à gauche dans la rangée des légendes (ex. titre de section). */
+  leftSlot?: React.ReactNode;
+  /** Contenu affiché au centre dans la rangée du haut (ex. sélecteur période/date). */
+  centerSlot?: React.ReactNode;
+  /** Contenu affiché à droite dans la rangée des légendes (ex. sélecteurs Produit/Mesure). */
+  rightSlot?: React.ReactNode;
   /** Mode contrôlé : le parent fournit les filtres (sidebar). Si définis, la barre de filtres intégrée est masquée. */
   duration?: DurationFilter;
   onDurationChange?: (d: DurationFilter) => void;
@@ -294,6 +302,9 @@ function formatQuarterLabel(yq: string): string {
 const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
   data,
   embedded = true,
+  leftSlot,
+  centerSlot,
+  rightSlot,
   duration: controlledDuration,
   onDurationChange,
   selectedDate: selectedDateProp,
@@ -343,6 +354,8 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
   const selectedProduct = isControlled ? controlledProduct! : internalProduct;
   const setSelectedProduct = isControlled ? onProductChange! : setInternalProduct;
 
+  const { isOutOfBounds, bounds: analysesBounds } = useAnalysesLaboBounds();
+
   useEffect(() => {
     if (measureNames.length > 0 && !measureNames.includes(selectedMeasure)) {
       setSelectedMeasure(measureNames[0]);
@@ -355,24 +368,60 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
       if (weekAnalysesData && weekAnalysesData.dates.length > 0) {
         const categories: string[] = [];
         const chartData: number[] = [];
+        const outOfBoundsIndices: number[] = [];
+        const conformeIndices: number[] = [];
         const hourSuffixes = [hourLabels.h7, hourLabels.h15, hourLabels.h23]; // '7h', '15h', '23h'
 
         const selectedNorm = normalizeMeasureLabel(selectedMeasure);
+        // Clé canonique (identique à Settings) pour que getBounds trouve toujours les bornes
+        const measureKeyForBounds =
+          ANALYSES_MEASURE_NAMES.find((m) => normalizeMeasureLabel(m) === selectedNorm) ??
+          selectedMeasure;
+        const debugPoints: { index: number; cat: string; rawValue: string; value: number; oob: boolean }[] = [];
         weekAnalysesData.dates.forEach((date, dayIndex) => {
           const dayRows = weekAnalysesData.rowsByDate[date] ?? [];
           const row = dayRows.find((r) => normalizeMeasureLabel(r.property) === selectedNorm);
           hourSuffixes.forEach((label, hourIndex) => {
             const hourKey = hours[hourIndex];
-            categories.push(`${WEEK_DAY_LABELS[dayIndex]} ${label}`);
+            const cat = `${WEEK_DAY_LABELS[dayIndex]} ${label}`;
+            categories.push(cat);
             const productHours = row && row[selectedProduct] ? row[selectedProduct] : null;
-            const v = productHours ? parseValue(productHours[hourKey]) : 0;
+            const rawValue = productHours?.[hourKey] ?? '';
+            const v = rawValue ? parseValue(rawValue) : 0;
             chartData.push(v);
+            const oob = rawValue !== '' && isOutOfBounds(selectedProduct, measureKeyForBounds, rawValue);
+            if (rawValue !== '' && oob) {
+              outOfBoundsIndices.push(categories.length - 1);
+            } else if (rawValue !== '') {
+              conformeIndices.push(categories.length - 1);
+            }
+            if (rawValue !== '') {
+              debugPoints.push({
+                index: categories.length - 1,
+                cat,
+                rawValue,
+                value: v,
+                oob,
+              });
+            }
           });
         });
+        const boundsUsed = analysesBounds[selectedProduct]?.[measureKeyForBounds];
+        if (outOfBoundsIndices.length > 0 || debugPoints.some((p) => p.oob)) {
+          console.log('[Graphique Semaine] Bornes / traits rouges', {
+            selectedProduct,
+            measureKeyForBounds,
+            boundsUsed: boundsUsed ?? 'non trouvé',
+            outOfBoundsIndices,
+            tousLesPointsOob: debugPoints.filter((p) => p.oob),
+          });
+        }
 
         return {
           categories,
           series: [{ name: productLabels[selectedProduct], data: chartData }],
+          outOfBoundsIndices,
+          conformeIndices,
         };
       }
       return getEmptyWeekData(productLabels[selectedProduct]);
@@ -381,8 +430,12 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
       if (monthAnalysesData && monthAnalysesData.dates.length > 0) {
         const categories: string[] = [];
         const chartData: number[] = [];
+        const outOfBoundsIndices: number[] = [];
+        const conformeIndices: number[] = [];
         const hourSuffixes = ['7h', '15h', '23h'] as const;
         const selectedNorm = normalizeMeasureLabel(selectedMeasure);
+        const measureKeyForBounds =
+          ANALYSES_MEASURE_NAMES.find((m) => normalizeMeasureLabel(m) === selectedNorm) ?? selectedMeasure;
 
         monthAnalysesData.dates.forEach((date) => {
           const dayRows = monthAnalysesData.rowsByDate[date] ?? [];
@@ -404,14 +457,20 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
             const hourKey = hours[hourIndex];
             categories.push(`${dateLabel} ${label}`);
             const productHours = row && row[selectedProduct] ? row[selectedProduct] : null;
-            const v = productHours ? parseValue(productHours[hourKey]) : 0;
+            const rawValue = productHours?.[hourKey] ?? '';
+            const v = rawValue ? parseValue(rawValue) : 0;
             chartData.push(v);
+            const oob = rawValue !== '' && isOutOfBounds(selectedProduct, measureKeyForBounds, rawValue);
+            if (rawValue !== '' && oob) outOfBoundsIndices.push(categories.length - 1);
+            else if (rawValue !== '') conformeIndices.push(categories.length - 1);
           });
         });
 
         return {
           categories,
           series: [{ name: productLabels[selectedProduct], data: chartData }],
+          outOfBoundsIndices,
+          conformeIndices,
         };
       }
       return getEmptyMonthData(selectedMonthProp, productLabels[selectedProduct]);
@@ -420,8 +479,12 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
       if (quarterAnalysesData && quarterAnalysesData.dates.length > 0) {
         const categories: string[] = [];
         const chartData: number[] = [];
+        const outOfBoundsIndices: number[] = [];
         const hourSuffixes = ['7h', '15h', '23h'] as const;
         const selectedNorm = normalizeMeasureLabel(selectedMeasure);
+        const measureKeyForBounds =
+          ANALYSES_MEASURE_NAMES.find((m) => normalizeMeasureLabel(m) === selectedNorm) ??
+          selectedMeasure;
 
         quarterAnalysesData.dates.forEach((date) => {
           const dayRows = quarterAnalysesData.rowsByDate[date] ?? [];
@@ -443,14 +506,18 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
             const hourKey = hours[hourIndex];
             categories.push(`${dateLabel} ${label}`);
             const productHours = row && row[selectedProduct] ? row[selectedProduct] : null;
-            const v = productHours ? parseValue(productHours[hourKey]) : 0;
+            const rawValue = productHours?.[hourKey] ?? '';
+            const v = rawValue ? parseValue(rawValue) : 0;
             chartData.push(v);
+            const oob = rawValue !== '' && isOutOfBounds(selectedProduct, measureKeyForBounds, rawValue);
+            if (rawValue !== '' && oob) outOfBoundsIndices.push(categories.length - 1);
           });
         });
 
         return {
           categories,
           series: [{ name: productLabels[selectedProduct], data: chartData }],
+          outOfBoundsIndices,
         };
       }
       return getEmptyQuarterData(selectedQuarterProp, productLabels[selectedProduct]);
@@ -459,8 +526,11 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
       if (semesterAnalysesData && semesterAnalysesData.dates.length > 0) {
         const categories: string[] = [];
         const chartData: number[] = [];
+        const outOfBoundsIndices: number[] = [];
         const hourSuffixes = ['7h', '15h', '23h'] as const;
         const selectedNorm = normalizeMeasureLabel(selectedMeasure);
+        const measureKeyForBounds =
+          ANALYSES_MEASURE_NAMES.find((m) => normalizeMeasureLabel(m) === selectedNorm) ?? selectedMeasure;
 
         semesterAnalysesData.dates.forEach((date) => {
           const dayRows = semesterAnalysesData.rowsByDate[date] ?? [];
@@ -482,14 +552,18 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
             const hourKey = hours[hourIndex];
             categories.push(`${dateLabel} ${label}`);
             const productHours = row && row[selectedProduct] ? row[selectedProduct] : null;
-            const v = productHours ? parseValue(productHours[hourKey]) : 0;
+            const rawValue = productHours?.[hourKey] ?? '';
+            const v = rawValue ? parseValue(rawValue) : 0;
             chartData.push(v);
+            const oob = rawValue !== '' && isOutOfBounds(selectedProduct, measureKeyForBounds, rawValue);
+            if (rawValue !== '' && oob) outOfBoundsIndices.push(categories.length - 1);
           });
         });
 
         return {
           categories,
           series: [{ name: productLabels[selectedProduct], data: chartData }],
+          outOfBoundsIndices,
         };
       }
       return getEmptySemesterData(selectedSemesterProp, productLabels[selectedProduct]);
@@ -498,8 +572,11 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
       if (yearAnalysesData && yearAnalysesData.dates.length > 0) {
         const categories: string[] = [];
         const chartData: number[] = [];
+        const outOfBoundsIndices: number[] = [];
         const hourSuffixes = ['7h', '15h', '23h'] as const;
         const selectedNorm = normalizeMeasureLabel(selectedMeasure);
+        const measureKeyForBounds =
+          ANALYSES_MEASURE_NAMES.find((m) => normalizeMeasureLabel(m) === selectedNorm) ?? selectedMeasure;
 
         yearAnalysesData.dates.forEach((date) => {
           const dayRows = yearAnalysesData.rowsByDate[date] ?? [];
@@ -521,14 +598,18 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
             const hourKey = hours[hourIndex];
             categories.push(`${dateLabel} ${label}`);
             const productHours = row && row[selectedProduct] ? row[selectedProduct] : null;
-            const v = productHours ? parseValue(productHours[hourKey]) : 0;
+            const rawValue = productHours?.[hourKey] ?? '';
+            const v = rawValue ? parseValue(rawValue) : 0;
             chartData.push(v);
+            const oob = rawValue !== '' && isOutOfBounds(selectedProduct, measureKeyForBounds, rawValue);
+            if (rawValue !== '' && oob) outOfBoundsIndices.push(categories.length - 1);
           });
         });
 
         return {
           categories,
           series: [{ name: productLabels[selectedProduct], data: chartData }],
+          outOfBoundsIndices,
         };
       }
       return getEmptyYearData(selectedYearProp, productLabels[selectedProduct]);
@@ -571,6 +652,8 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
     quarterAnalysesData,
     semesterAnalysesData,
     yearAnalysesData,
+    isOutOfBounds,
+    analysesBounds,
   ]);
 
   const isDay = duration === 'day';
@@ -641,6 +724,9 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
           zoom: {
             enabled: false,
           },
+          animations: {
+            dynamicAnimation: { enabled: false },
+          },
         },
         stroke: {
           width: 2,
@@ -679,16 +765,7 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
           title: { text: xTitle, style: { fontSize: '12px' } },
           crosshairs: { show: true, position: 'back' as const, stroke: { width: 1, color: '#b1b9c4' } },
         },
-        legend: {
-          position: 'top',
-          horizontalAlign: 'left',
-          fontFamily: 'Satoshi',
-          fontWeight: 500,
-          fontSize: '14px',
-          markers: {
-            radius: 99,
-          },
-        },
+        legend: { show: false },
         fill: {
           opacity: 1,
         },
@@ -709,14 +786,39 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
     }
 
     if (isWeek) {
-      // Vue Semaine : design type ChartOne, fond transparent
+      // Vue Semaine : valeurs hors intervalle (bornes Settings) = ligne verticale rouge + point rouge.
       const weekColor = isDarkMode ? '#4ade80' : '#044c4b';
+      const conformeBlue = '#3c50e0';
+      const oobRed = '#DC2626';
+      const weekChartData = chartData as {
+        categories: string[];
+        series: { name: string; data: number[] }[];
+        outOfBoundsIndices?: number[];
+        conformeIndices?: number[];
+      };
+      const outOfBoundsIndices = weekChartData.outOfBoundsIndices ?? [];
+      const conformeIndices = weekChartData.conformeIndices ?? [];
+      const categories = weekChartData.categories ?? [];
+      // Points conformes (données saisies, dans les bornes) : marqueurs bleus.
+      const discreteMarkersConform = conformeIndices.map((dataPointIndex) => ({
+        seriesIndex: 0,
+        dataPointIndex,
+        fillColor: conformeBlue,
+        strokeColor: '#fff',
+        size: 5,
+        strokeWidth: 1,
+      }));
+      // Points hors intervalle : marqueurs rouges + annotation verticale.
+      const discreteMarkersOob = outOfBoundsIndices.map((dataPointIndex) => ({
+        seriesIndex: 0,
+        dataPointIndex,
+        fillColor: oobRed,
+        strokeColor: '#fff',
+        size: 5,
+        strokeWidth: 1,
+      }));
       return {
-        legend: {
-          show: false,
-          position: 'top',
-          horizontalAlign: 'left',
-        },
+        legend: { show: false },
         colors: [weekColor],
         chart: {
           fontFamily: 'Satoshi, sans-serif',
@@ -734,23 +836,31 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
           toolbar: {
             show: false,
           },
+          animations: {
+            dynamicAnimation: { enabled: false },
+          },
+        },
+        annotations: {
+          xaxis: outOfBoundsIndices.map((dataPointIndex) => {
+            const categoryLabel = categories[dataPointIndex];
+            return {
+              x: categoryLabel,
+              borderColor: oobRed,
+              strokeWidth: 2,
+              opacity: 1,
+              strokeDashArray: 0,
+              label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
+            };
+          }),
         },
         responsive: [
           {
             breakpoint: 1024,
-            options: {
-              chart: {
-                height: 300,
-              },
-            },
+            options: { chart: { height: 300 } },
           },
           {
             breakpoint: 1366,
-            options: {
-              chart: {
-                height: 350,
-              },
-            },
+            options: { chart: { height: 350 } },
           },
         ],
         stroke: {
@@ -768,16 +878,8 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
           },
         },
         grid: {
-          xaxis: {
-            lines: {
-              show: false,
-            },
-          },
-          yaxis: {
-            lines: {
-              show: true,
-            },
-          },
+          xaxis: { lines: { show: false } },
+          yaxis: { lines: { show: true } },
         },
         dataLabels: {
           enabled: false,
@@ -790,7 +892,7 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
           strokeOpacity: 0.9,
           strokeDashArray: 0,
           fillOpacity: 1,
-          discrete: [],
+          discrete: [...discreteMarkersConform, ...discreteMarkersOob],
           hover: {
             size: undefined,
             sizeOffset: 3,
@@ -827,28 +929,340 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
       };
     }
 
-    // Vue Mois : même design que Semaine (area, fond transparent, même style)
-    // Du plus clair au plus foncé : Semaine → Mois → Trimestre → Semestre → Année
-    const areaColor =
-      duration === 'month'
-        ? isDarkMode ? '#E5E7EB' : '#000000'
-        : duration === 'quarter'
-          ? '#7B9FD4'
-          : duration === 'semester'
-            ? '#6960ec'
-            : duration === 'year'
-              ? '#3C50E0'
-              : '#B4CFEC';
-    const areaStroke =
-      duration === 'month'
-        ? isDarkMode ? '#E5E7EB' : '#000000'
-        : duration === 'quarter'
-          ? '#7B9FD4'
-          : duration === 'semester'
-            ? '#6960ec'
-            : duration === 'year'
-              ? '#3C50E0'
-              : '#B4CFEC';
+    // Vue Mois : valeurs hors intervalle = ligne verticale rouge + point rouge (comme Semaine)
+    if (duration === 'month') {
+      const oobRed = '#DC2626';
+      const conformeBlue = '#3c50e0';
+      const monthChartData = chartData as {
+        categories: string[];
+        series: { name: string; data: number[] }[];
+        outOfBoundsIndices?: number[];
+        conformeIndices?: number[];
+      };
+      const outOfBoundsIndices = monthChartData.outOfBoundsIndices ?? [];
+      const conformeIndices = monthChartData.conformeIndices ?? [];
+      const categoriesMonth = monthChartData.categories ?? [];
+      const monthColor = isDarkMode ? '#E5E7EB' : '#000000';
+      const discreteMarkersConform = conformeIndices.map((dataPointIndex) => ({
+        seriesIndex: 0,
+        dataPointIndex,
+        fillColor: conformeBlue,
+        strokeColor: '#fff',
+        size: 3,
+        strokeWidth: 1,
+      }));
+      const discreteMarkersOob = outOfBoundsIndices.map((dataPointIndex) => ({
+        seriesIndex: 0,
+        dataPointIndex,
+        fillColor: oobRed,
+        strokeColor: '#fff',
+        size: 3,
+        strokeWidth: 1,
+      }));
+      return {
+        legend: { show: false, position: 'top', horizontalAlign: 'left' },
+        colors: [monthColor],
+        chart: {
+          fontFamily: 'Satoshi, sans-serif',
+          height: 335,
+          type: 'area',
+          background: 'transparent',
+          dropShadow: { enabled: true, color: '#623CEA14', top: 10, blur: 4, left: 0, opacity: 0.1 },
+          toolbar: { show: false },
+          animations: { dynamicAnimation: { enabled: false } },
+        },
+        annotations: {
+          xaxis: outOfBoundsIndices.map((dataPointIndex) => ({
+            x: categoriesMonth[dataPointIndex],
+            borderColor: oobRed,
+            strokeWidth: 2,
+            opacity: 1,
+            strokeDashArray: 0,
+            label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
+          })),
+        },
+        responsive: [
+          { breakpoint: 1024, options: { chart: { height: 300 } } },
+          { breakpoint: 1366, options: { chart: { height: 350 } } },
+        ],
+        stroke: { width: 2, curve: 'straight' },
+        fill: {
+          type: 'gradient',
+          gradient: { shade: 'dark', type: 'vertical', shadeIntensity: 0.5, opacityFrom: 0.55, opacityTo: 0.05 },
+        },
+        grid: { xaxis: { lines: { show: false } }, yaxis: { lines: { show: true } } },
+        dataLabels: { enabled: false },
+        markers: {
+          size: 1,
+          colors: '#fff',
+          strokeColors: [monthColor],
+          strokeWidth: 1,
+          strokeOpacity: 0.9,
+          strokeDashArray: 0,
+          fillOpacity: 1,
+          discrete: [...discreteMarkersConform, ...discreteMarkersOob],
+          hover: { size: 3, sizeOffset: 2 },
+        },
+        xaxis: {
+          type: 'category',
+          categories: chartData.categories,
+          title: { text: xTitle, style: { fontSize: '12px' } },
+          labels: { show: false, style: { fontSize: '9px' }, rotate: -45 },
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          crosshairs: { show: true, position: 'back' as const, stroke: { width: 1, color: '#b1b9c4' } },
+        },
+        yaxis: {
+          title: { text: selectedMeasure || 'Valeur', style: { fontSize: '12px' } },
+          labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
+        },
+        tooltip: { y: { formatter: (val: number) => formatYAxisLabel(val) } },
+      };
+    }
+
+    // Vue Trimestre : valeurs hors intervalle = ligne verticale rouge + point rouge (comme Semaine / Mois)
+    if (duration === 'quarter') {
+      const oobRed = '#DC2626';
+      const quarterChartData = chartData as {
+        categories: string[];
+        series: { name: string; data: number[] }[];
+        outOfBoundsIndices?: number[];
+      };
+      const outOfBoundsIndices = quarterChartData.outOfBoundsIndices ?? [];
+      const categoriesQuarter = quarterChartData.categories ?? [];
+      const quarterColor = '#7B9FD4';
+      const discreteMarkersOob = outOfBoundsIndices.map((dataPointIndex) => ({
+        seriesIndex: 0,
+        dataPointIndex,
+        fillColor: oobRed,
+        strokeColor: '#fff',
+        size: 2,
+        strokeWidth: 1,
+      }));
+      return {
+        legend: { show: false, position: 'top', horizontalAlign: 'left' },
+        colors: [quarterColor],
+        chart: {
+          fontFamily: 'Satoshi, sans-serif',
+          height: 335,
+          type: 'area',
+          background: 'transparent',
+          dropShadow: { enabled: true, color: '#623CEA14', top: 10, blur: 4, left: 0, opacity: 0.1 },
+          toolbar: { show: false },
+          animations: { dynamicAnimation: { enabled: false } },
+        },
+        annotations: {
+          xaxis: outOfBoundsIndices.map((dataPointIndex) => ({
+            x: categoriesQuarter[dataPointIndex],
+            borderColor: oobRed,
+            strokeWidth: 2,
+            opacity: 1,
+            strokeDashArray: 0,
+            label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
+          })),
+        },
+        responsive: [
+          { breakpoint: 1024, options: { chart: { height: 300 } } },
+          { breakpoint: 1366, options: { chart: { height: 350 } } },
+        ],
+        stroke: { width: 2, curve: 'straight' },
+        fill: {
+          type: 'gradient',
+          gradient: { shade: 'dark', type: 'vertical', shadeIntensity: 0.5, opacityFrom: 0.55, opacityTo: 0.05 },
+        },
+        grid: { xaxis: { lines: { show: false } }, yaxis: { lines: { show: true } } },
+        dataLabels: { enabled: false },
+        markers: {
+          size: 1,
+          colors: '#fff',
+          strokeColors: [quarterColor],
+          strokeWidth: 1,
+          strokeOpacity: 0.9,
+          strokeDashArray: 0,
+          fillOpacity: 1,
+          discrete: discreteMarkersOob,
+          hover: { size: 3, sizeOffset: 2 },
+        },
+        xaxis: {
+          type: 'category',
+          categories: chartData.categories,
+          title: { text: xTitle, style: { fontSize: '12px' } },
+          labels: { show: false, style: { fontSize: '9px' }, rotate: -45 },
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          crosshairs: { show: true, position: 'back' as const, stroke: { width: 1, color: '#b1b9c4' } },
+        },
+        yaxis: {
+          title: { text: selectedMeasure || 'Valeur', style: { fontSize: '12px' } },
+          labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
+        },
+        tooltip: { y: { formatter: (val: number) => formatYAxisLabel(val) } },
+      };
+    }
+
+    // Vue Semestre : valeurs hors intervalle = ligne verticale rouge + point rouge (comme Semaine / Mois / Trimestre)
+    if (duration === 'semester') {
+      const oobRed = '#DC2626';
+      const semesterChartData = chartData as {
+        categories: string[];
+        series: { name: string; data: number[] }[];
+        outOfBoundsIndices?: number[];
+      };
+      const outOfBoundsIndices = semesterChartData.outOfBoundsIndices ?? [];
+      const categoriesSemester = semesterChartData.categories ?? [];
+      const semesterColor = '#6960ec';
+      const discreteMarkersOob = outOfBoundsIndices.map((dataPointIndex) => ({
+        seriesIndex: 0,
+        dataPointIndex,
+        fillColor: oobRed,
+        strokeColor: '#fff',
+        size: 2,
+        strokeWidth: 0,
+      }));
+      return {
+        legend: { show: false, position: 'top', horizontalAlign: 'left' },
+        colors: [semesterColor],
+        chart: {
+          fontFamily: 'Satoshi, sans-serif',
+          height: 335,
+          type: 'area',
+          background: 'transparent',
+          dropShadow: { enabled: true, color: '#623CEA14', top: 10, blur: 4, left: 0, opacity: 0.1 },
+          toolbar: { show: false },
+          animations: { dynamicAnimation: { enabled: false } },
+        },
+        annotations: {
+          xaxis: outOfBoundsIndices.map((dataPointIndex) => ({
+            x: categoriesSemester[dataPointIndex],
+            borderColor: oobRed,
+            strokeWidth: 2,
+            opacity: 1,
+            strokeDashArray: 0,
+            label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
+          })),
+        },
+        responsive: [
+          { breakpoint: 1024, options: { chart: { height: 300 } } },
+          { breakpoint: 1366, options: { chart: { height: 350 } } },
+        ],
+        stroke: { width: 2, curve: 'straight' },
+        fill: {
+          type: 'gradient',
+          gradient: { shade: 'dark', type: 'vertical', shadeIntensity: 0.5, opacityFrom: 0.55, opacityTo: 0.05 },
+        },
+        grid: { xaxis: { lines: { show: false } }, yaxis: { lines: { show: true } } },
+        dataLabels: { enabled: false },
+        markers: {
+          size: 1,
+          colors: '#fff',
+          strokeColors: [semesterColor],
+          strokeWidth: 1,
+          strokeOpacity: 0.9,
+          strokeDashArray: 0,
+          fillOpacity: 1,
+          discrete: discreteMarkersOob,
+          hover: { size: 3, sizeOffset: 2 },
+        },
+        xaxis: {
+          type: 'category',
+          categories: chartData.categories,
+          title: { text: xTitle, style: { fontSize: '12px' } },
+          labels: { show: false, style: { fontSize: '9px' }, rotate: -45 },
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          crosshairs: { show: true, position: 'back' as const, stroke: { width: 1, color: '#b1b9c4' } },
+        },
+        yaxis: {
+          title: { text: selectedMeasure || 'Valeur', style: { fontSize: '12px' } },
+          labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
+        },
+        tooltip: { y: { formatter: (val: number) => formatYAxisLabel(val) } },
+      };
+    }
+
+    // Vue Année : valeurs hors intervalle = ligne verticale rouge + point rouge (comme Semaine / Mois / Trimestre / Semestre)
+    if (duration === 'year') {
+      const oobRed = '#DC2626';
+      const yearChartData = chartData as {
+        categories: string[];
+        series: { name: string; data: number[] }[];
+        outOfBoundsIndices?: number[];
+      };
+      const outOfBoundsIndices = yearChartData.outOfBoundsIndices ?? [];
+      const categoriesYear = yearChartData.categories ?? [];
+      const yearColor = '#3C50E0';
+      const discreteMarkersOob = outOfBoundsIndices.map((dataPointIndex) => ({
+        seriesIndex: 0,
+        dataPointIndex,
+        fillColor: oobRed,
+        strokeColor: '#fff',
+        size: 2,
+        strokeWidth: 0,
+      }));
+      return {
+        legend: { show: false, position: 'top', horizontalAlign: 'left' },
+        colors: [yearColor],
+        chart: {
+          fontFamily: 'Satoshi, sans-serif',
+          height: 335,
+          type: 'area',
+          background: 'transparent',
+          dropShadow: { enabled: true, color: '#623CEA14', top: 10, blur: 4, left: 0, opacity: 0.1 },
+          toolbar: { show: false },
+          animations: { dynamicAnimation: { enabled: false } },
+        },
+        annotations: {
+          xaxis: outOfBoundsIndices.map((dataPointIndex) => ({
+            x: categoriesYear[dataPointIndex],
+            borderColor: oobRed,
+            strokeWidth: 2,
+            opacity: 1,
+            strokeDashArray: 0,
+            label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
+          })),
+        },
+        responsive: [
+          { breakpoint: 1024, options: { chart: { height: 300 } } },
+          { breakpoint: 1366, options: { chart: { height: 350 } } },
+        ],
+        stroke: { width: 2, curve: 'straight' },
+        fill: {
+          type: 'gradient',
+          gradient: { shade: 'dark', type: 'vertical', shadeIntensity: 0.5, opacityFrom: 0.55, opacityTo: 0.05 },
+        },
+        grid: { xaxis: { lines: { show: false } }, yaxis: { lines: { show: true } } },
+        dataLabels: { enabled: false },
+        markers: {
+          size: 1,
+          colors: '#fff',
+          strokeColors: [yearColor],
+          strokeWidth: 1,
+          strokeOpacity: 0.9,
+          strokeDashArray: 0,
+          fillOpacity: 1,
+          discrete: discreteMarkersOob,
+          hover: { size: 3, sizeOffset: 2 },
+        },
+        xaxis: {
+          type: 'category',
+          categories: chartData.categories,
+          title: { text: xTitle, style: { fontSize: '12px' } },
+          labels: { show: false, style: { fontSize: '9px' }, rotate: -45 },
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          crosshairs: { show: true, position: 'back' as const, stroke: { width: 1, color: '#b1b9c4' } },
+        },
+        yaxis: {
+          title: { text: selectedMeasure || 'Valeur', style: { fontSize: '12px' } },
+          labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
+        },
+        tooltip: { y: { formatter: (val: number) => formatYAxisLabel(val) } },
+      };
+    }
+
+    // Fallback (ne devrait pas être atteint : toutes les durées ont leur bloc)
+    const areaColor = '#B4CFEC';
+    const areaStroke = '#B4CFEC';
     return {
       legend: {
         show: false,
@@ -965,7 +1379,7 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
         y: { formatter: (val: number) => formatYAxisLabel(val) },
       },
     };
-  }, [chartData.categories, duration, isDay, isWeek, xTitle, selectedMeasure, isDarkMode]);
+  }, [chartData, duration, isDay, isWeek, xTitle, selectedMeasure, isDarkMode]);
 
   return (
     <div className={embedded ? EMBEDDED_WRAPPER_CLASS : ''}>
@@ -1015,6 +1429,13 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
           </div>
         </div>
       )}
+      {(leftSlot || centerSlot || rightSlot) && (
+        <div className="mb-3 flex items-center gap-2">
+          <div className="flex-1">{leftSlot}</div>
+          <div className="flex justify-center gap-2">{centerSlot}</div>
+          <div className="flex flex-1 flex-wrap justify-end gap-2">{rightSlot}</div>
+        </div>
+      )}
       <div className={isControlled ? 'w-full min-h-[300px]' : '-ml-5 w-full min-h-[300px]'}>
         {chartData.series.length > 0 && chartData.categories.length > 0 ? (
           <ReactApexChart
@@ -1031,6 +1452,34 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
           </div>
         )}
       </div>
+      {isDay && (
+        <div className="mt-3 flex flex-wrap justify-end gap-2">
+          <div className="flex items-center gap-2 rounded border border-[#EA580C] bg-white px-3 py-1 shadow-sm dark:bg-[#EA580C]/20">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#EA580C] shadow-sm" />
+            <span className="text-xs font-semibold tracking-wide text-[#EA580C]">7h</span>
+          </div>
+          <div className="flex items-center gap-2 rounded border border-[#059669] bg-white px-3 py-1 shadow-sm dark:bg-[#059669]/20">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#059669] shadow-sm" />
+            <span className="text-xs font-semibold tracking-wide text-[#059669]">15h</span>
+          </div>
+          <div className="flex items-center gap-2 rounded border border-[#DC2626] bg-white px-3 py-1 shadow-sm dark:bg-[#DC2626]/20">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#DC2626] shadow-sm" />
+            <span className="text-xs font-semibold tracking-wide text-[#DC2626]">23h</span>
+          </div>
+        </div>
+      )}
+      {(isWeek || duration === 'month') && (
+        <div className="mt-3 flex flex-wrap justify-end gap-2">
+          <div className="flex items-center gap-2 rounded border border-[#3c50e0] bg-white px-3 py-1 shadow-sm dark:bg-[#3c50e0]/20">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#3c50e0] shadow-sm" />
+            <span className="text-xs font-semibold tracking-wide text-[#3c50e0]">Conforme</span>
+          </div>
+          <div className="flex items-center gap-2 rounded border border-[#DC2626] bg-white px-3 py-1 shadow-sm dark:bg-[#DC2626]/20">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#DC2626] shadow-sm" />
+            <span className="text-xs font-semibold tracking-wide text-[#DC2626]">Non conforme</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

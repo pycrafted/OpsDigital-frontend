@@ -5,7 +5,7 @@ const Saisie: React.FC = () => {
     <div className="rounded-2xl border border-stroke bg-gradient-to-br from-sky-50 to-indigo-50 shadow-lg dark:border-strokedark dark:from-boxdark dark:to-meta-4">
       {/* En-tête aligné sur la page saisie reformateur */}
       <div className="border-b border-stroke/60 px-6 py-5 dark:border-strokedark/80">
-        <p className="text-2xl font-semibold text-primary">
+        <p className="text-sm font-semibold text-primary dark:text-white">
           Saisie
         </p>
       </div>

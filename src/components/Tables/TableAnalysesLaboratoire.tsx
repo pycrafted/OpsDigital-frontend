@@ -1,13 +1,14 @@
 import React from 'react';
 import {
   AnalyseRow,
-  hourLabels,
   hours,
-  productLabels,
   products,
   type HourKey,
   type ProductKey,
 } from '../../data/analysesLaboratoire';
+import { useAnalysesLaboLabels } from '../../context/AnalysesLaboLabelsContext';
+import { useAnalysesLaboBounds } from '../../context/AnalysesLaboBoundsContext';
+import { useTableView } from '../../context/TableViewContext';
 
 export interface TableAnalysesLaboratoireProps {
   data: AnalyseRow[];
@@ -23,6 +24,11 @@ export interface TableAnalysesLaboratoireProps {
   showValidateButton?: boolean;
   /** Données telles que sauvegardées (pour surligner les cellules modifiées mais non sauvegardées). */
   lastSavedData?: AnalyseRow[] | null;
+  /** Si true, pas de hauteur max ni scroll interne : toutes les lignes sont visibles (scroll de la page). */
+  allRowsVisible?: boolean;
+  sectionTitle?: string;
+  /** Si true, affiche le sélecteur de date dans la barre de filtres (pour les pages individuelles sans navbar date). */
+  showInlineDate?: boolean;
 }
 
 const CHEVRON_DOWN = (
@@ -49,13 +55,19 @@ const LOCK_OPEN = (
   </svg>
 );
 
-const VALIDATE_ICON = (
-  <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
-    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-  </svg>
-);
 
-const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ data, onDataChange, selectedDate, onDateChange, loading = false, onValidate, saving = false, showValidateButton = false, lastSavedData = null }) => {
+/** Pour l’affichage : "15.0" → "15", "15.2" → "15.2" (sans .0 inutile). */
+function formatDisplayValue(val: string): string {
+  if (val === '' || val == null) return '';
+  const n = parseFloat(String(val).replace(',', '.'));
+  if (Number.isNaN(n)) return val;
+  return Number.isInteger(n) ? String(n) : String(n);
+}
+
+const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ data, onDataChange, selectedDate, onDateChange, loading = false, onValidate, saving = false, showValidateButton = false, lastSavedData = null, allRowsVisible = false, sectionTitle, showInlineDate = false }) => {
+  const { getProductLabel, getHourLabel, getMeasureLabel } = useAnalysesLaboLabels();
+  const { isOutOfBounds } = useAnalysesLaboBounds();
+  const { hideEmptyColumns } = useTableView();
   const measures = React.useMemo(() => data.map((row) => row.property), [data]);
   const [selectedHours, setSelectedHours] = React.useState<string[]>(['h7', 'h15', 'h23']);
   const [selectedProducts, setSelectedProducts] = React.useState<string[]>(() => [...products]);
@@ -73,6 +85,8 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
   const [showProductDropdown, setShowProductDropdown] = React.useState(false);
   const [showMeasureDropdown, setShowMeasureDropdown] = React.useState(false);
   const [showHourDropdown, setShowHourDropdown] = React.useState(false);
+  /** Cellule en cours d’édition : on affiche la valeur brute pour permettre de saisir "14.5" (le point). */
+  const [focusedCell, setFocusedCell] = React.useState<{ rowIndex: number; product: ProductKey; hour: HourKey } | null>(null);
   const productDropdownRef = React.useRef<HTMLDivElement>(null);
   const productTriggerRef = React.useRef<HTMLDivElement>(null);
   const measureDropdownRef = React.useRef<HTMLDivElement>(null);
@@ -87,6 +101,7 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
     hour: HourKey,
     value: string
   ) => {
+    if (value !== '' && !/^-?\d*[.,]?\d*$/.test(value)) return;
     const newData = [...data];
     newData[rowIndex] = {
       ...newData[rowIndex],
@@ -114,9 +129,19 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
   const filteredHours = hours.filter((h) => selectedHours.includes(h));
   const filteredProducts = products.filter((p) => selectedProducts.includes(p));
   const filteredData = data.filter((row) => selectedMeasures.includes(row.property));
+  const visibleProducts = hideEmptyColumns
+    ? filteredProducts.filter((product) =>
+        filteredHours.some((hour) =>
+          filteredData.some((row) => {
+            const val = row[product]?.[hour];
+            return val !== '' && val != null;
+          })
+        )
+      )
+    : filteredProducts;
 
   const totalRows = filteredData.length;
-  const totalCols = filteredProducts.length * filteredHours.length;
+  const totalCols = visibleProducts.length * filteredHours.length;
 
   const handleTableKeyDown = (e: React.KeyboardEvent<HTMLTableElement>) => {
     if (!canEdit) return;
@@ -171,12 +196,12 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
   }, []);
 
   const filterTriggerClass =
-    'flex cursor-pointer items-center gap-2 rounded-xl border border-stroke/70 bg-white/90 px-4 py-2.5 text-sm font-medium text-[#3c50e0] shadow-sm transition hover:border-primary/50 hover:bg-white hover:text-primary dark:border-strokedark dark:bg-boxdark dark:text-white dark:hover:border-primary dark:hover:bg-meta-4/80 dark:hover:text-white';
+    'flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white';
   const dropdownPanelClass =
     'absolute left-0 top-full z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark';
 
   return (
-    <div className="relative flex min-h-0 flex-1 w-full flex-col gap-6 overflow-hidden">
+    <div className={`relative flex w-full flex-col gap-6 ${allRowsVisible ? 'min-h-0' : 'min-h-0 flex-1 overflow-hidden'}`}>
       {loading && (
         <div className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-white/80 dark:bg-boxdark/80">
           <span className="text-sm font-medium text-primary">Chargement…</span>
@@ -184,8 +209,23 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
       )}
       {/* Barre de filtres (centrés) + bouton cadenas à droite */}
       <div className="flex w-full flex-shrink-0 items-center gap-2">
-        <div className="flex-1" />
+        <div className="flex-1">{sectionTitle && <p className="text-sm font-semibold text-primary dark:text-white">{sectionTitle}</p>}</div>
         <div className="flex flex-wrap items-center justify-center gap-2">
+          {/* Date (inline) */}
+          {showInlineDate && (
+            <>
+              <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
+                <input
+                  type="date"
+                  value={selectedDate}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => onDateChange(e.target.value)}
+                  className="w-[7.5rem] rounded border-0 bg-transparent py-0.5 text-xs font-bold text-primary outline-none dark:text-white"
+                />
+              </div>
+              <span className="h-4 w-px bg-primary/30" />
+            </>
+          )}
           {/* Mesure */}
           <div className="relative" ref={measureDropdownRef}>
             <button
@@ -213,7 +253,7 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
                       }`}
                     >
                       {isSelected && CHECK}
-                      <span className={isSelected ? 'font-medium' : ''}>{measure}</span>
+                      <span className={isSelected ? 'font-medium' : ''}>{getMeasureLabel(measure)}</span>
                     </button>
                   );
                 })}
@@ -246,7 +286,7 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
                       }`}
                     >
                       {isSelected && CHECK}
-                      {hourLabels[hour]}
+                      {getHourLabel(hour)}
                     </button>
                   );
                 })}
@@ -279,7 +319,7 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
                       }`}
                     >
                       {isSelected && CHECK}
-                      {productLabels[product]}
+                      {getProductLabel(product)}
                     </button>
                   );
                 })}
@@ -293,17 +333,23 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
               type="button"
               onClick={() => onValidate?.()}
               disabled={saving}
-              className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-stroke/70 bg-white/90 px-3 text-green-600 transition hover:border-green-500 hover:bg-white hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-strokedark dark:bg-boxdark dark:text-green-400 dark:hover:border-green-500 dark:hover:bg-meta-4/80 dark:hover:text-green-300"
-              aria-label="Valider et sauvegarder les modifications"
+              className="rounded bg-primary px-6 py-2 text-sm font-medium text-white transition hover:bg-primary/90 disabled:opacity-70"
+              aria-label="Enregistrer les modifications"
             >
-              {VALIDATE_ICON}
-              <span className="text-sm font-medium text-inherit">{saving ? 'Sauvegarde…' : 'Valider'}</span>
+              {saving ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Enregistrement…
+                </span>
+              ) : (
+                'Enregistrer'
+              )}
             </button>
           )}
           <button
             type="button"
             onClick={() => setCanEdit((prev) => !prev)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-stroke/70 bg-white/90 text-primary transition hover:border-primary/50 hover:bg-white dark:border-strokedark dark:bg-boxdark dark:hover:border-primary dark:hover:bg-meta-4/80 dark:text-primary"
+            className="flex shrink-0 items-center justify-center rounded border border-primary bg-white px-2 py-1 text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white"
             aria-label="Modification directe"
           >
             {canEdit ? LOCK_OPEN : LOCK_CLOSED}
@@ -311,10 +357,9 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
         </div>
       </div>
 
-      {/* Scroll horizontal si tableau large ; overflow-y-hidden pour éviter une 2e scrollbar verticale (la seule reste collée au tableau) */}
-      <div className="min-w-0 overflow-x-auto overflow-y-hidden">
-        <div className="w-max max-h-[calc(100vh-14rem)] overflow-auto">
-          <div className="min-h-full w-max">
+      {/* Un seul conteneur de scroll : quand hideEmptyColumns, w-max + mx-auto pour que la scrollbar verticale reste collée au tableau comme l'horizontale */}
+      <div className={`min-w-0 ${allRowsVisible ? 'overflow-x-auto' : 'max-h-[calc(100vh-14rem)] overflow-auto'}${hideEmptyColumns ? ' w-max mx-auto' : ''}`}>
+        <div className="min-h-full w-max">
           <table
             ref={tableRef}
             className="min-w-full border-collapse table-fixed"
@@ -323,7 +368,7 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
           >
           <colgroup>
             <col className="w-28 min-w-[6.5rem] max-w-[7rem]" />
-            {filteredProducts.flatMap((product) =>
+            {visibleProducts.flatMap((product) =>
               filteredHours.map((hour) => (
                 <col key={`${product}-${hour}`} className="w-[5.5rem] min-w-[5.5rem] max-w-[5.5rem]" />
               ))
@@ -336,24 +381,24 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
                 className="sticky left-0 z-20 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 border-t-0 border-l-0 bg-[#eff6ff] py-1.5 pl-2 pr-2 dark:border-strokedark dark:border-t-0 dark:border-l-0 dark:bg-[#273342]"
                 aria-label=""
               />
-              {filteredProducts.map((product) => (
+              {visibleProducts.map((product) => (
                 <th
                   key={product}
                   colSpan={filteredHours.length}
                   className="sticky top-0 z-10 min-w-[5.5rem] border-b border-r border-stroke/70 bg-primary py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark"
                 >
-                  {productLabels[product]}
+                  {getProductLabel(product)}
                 </th>
               ))}
             </tr>
             <tr>
-              {filteredProducts.map((product) =>
+              {visibleProducts.map((product) =>
                 filteredHours.map((hour) => (
                   <th
                     key={`${product}-${hour}`}
                     className="sticky top-7 z-10 min-w-[5.5rem] w-[5.5rem] border-r border-b border-stroke/70 bg-primary/90 py-1 text-center text-[11px] font-medium text-white/95 dark:border-strokedark"
                   >
-                    {hourLabels[hour]}
+                    {getHourLabel(hour)}
                   </th>
                 ))
               )}
@@ -368,34 +413,44 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
                   className={`group border-b border-stroke/50 odd:bg-slate-100 even:bg-white transition-colors dark:border-strokedark/70 dark:odd:bg-meta-4/30 dark:even:bg-boxdark ${canEdit ? 'hover:bg-slate-200 dark:hover:bg-meta-4/50' : ''}`}
                 >
                   <td className={`sticky left-0 z-10 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 bg-[#3c50e0] py-1 pl-2 pr-2 text-sm font-medium text-white dark:border-strokedark dark:bg-[#3c50e0] dark:text-white ${canEdit ? 'group-hover:bg-[#3c50e0]/90 dark:group-hover:bg-[#3c50e0]/90' : ''}`}>
-                    <span className="block truncate" title={row.property}>{row.property}</span>
+                    <span className="block truncate" title={row.property}>{getMeasureLabel(row.property)}</span>
                   </td>
-                  {filteredProducts.map((product, productIndex) =>
+                  {visibleProducts.map((product, productIndex) =>
                     filteredHours.map((hour, hourIndex) => {
                       const value = row[product][hour];
                       const savedRow = lastSavedData != null && lastSavedData.length > 0 ? lastSavedData[originalIndex] : null;
                       const savedValue = savedRow?.[product]?.[hour];
                       const isModified = savedRow != null && savedValue !== value;
+                      const outOfBounds = isOutOfBounds(product, row.property, value);
                       const colIndex = productIndex * filteredHours.length + hourIndex;
+                      const isFocused = focusedCell != null && focusedCell.rowIndex === originalIndex && focusedCell.product === product && focusedCell.hour === hour;
                       return (
                         <td
                           key={`${product}-${hour}`}
-                          className={`min-w-[5.5rem] w-[5.5rem] border-r border-stroke/50 py-0 px-1.5 dark:border-strokedark/70 ${isModified ? 'bg-[#24303f] dark:bg-[#f1f5f9]' : 'bg-transparent'}`}
+                          className={`min-w-[5.5rem] w-[5.5rem] border-r border-stroke/50 py-0 px-1.5 dark:border-strokedark/70 ${
+                            outOfBounds ? '!bg-red-600 dark:!bg-red-600' : isModified ? 'bg-[#24303f] dark:bg-[#f1f5f9]' : 'bg-transparent'
+                          }`}
                         >
                           <input
                             type="text"
-                            value={value}
+                            value={isFocused ? value : formatDisplayValue(value)}
                             readOnly={!canEdit}
+                            onFocus={() => setFocusedCell({ rowIndex: originalIndex, product, hour })}
+                            onBlur={() => setFocusedCell(null)}
+                            inputMode="decimal"
+                            title={outOfBounds ? 'Hors normes : valeur en dehors de l\'intervalle min/max (paramètres)' : 'Nombre (virgule ou point décimal)'}
                             onChange={(e) => handleChange(originalIndex, product, hour, e.target.value)}
                             data-cell="true"
                             data-row={rowIndex}
                             data-col={colIndex}
                             className={`w-full py-1 pr-2 text-right text-sm font-medium outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 ${
-                              isModified
-                                ? 'bg-[#24303f] text-white placeholder:text-white/50 dark:bg-[#f1f5f9] dark:text-black dark:placeholder:text-black/50'
-                                : 'bg-transparent ' + (canEdit
-                                  ? 'text-slate-800 focus:ring-2 focus:ring-primary/20 dark:text-slate-200'
-                                  : 'cursor-default text-slate-800 dark:text-slate-200')
+                              outOfBounds
+                                ? '!bg-red-600 !text-white placeholder:!text-white/70 dark:!bg-red-600 dark:!text-white'
+                                : isModified
+                                  ? 'bg-[#24303f] text-white placeholder:text-white/50 dark:bg-[#f1f5f9] dark:text-black dark:placeholder:text-black/50'
+                                  : 'bg-transparent ' + (canEdit
+                                    ? 'text-slate-800 focus:ring-2 focus:ring-primary/20 dark:text-slate-200'
+                                    : 'cursor-default text-slate-800 dark:text-slate-200')
                             }`}
                             placeholder="—"
                           />
@@ -408,7 +463,6 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
             })}
           </tbody>
         </table>
-          </div>
         </div>
       </div>
     </div>

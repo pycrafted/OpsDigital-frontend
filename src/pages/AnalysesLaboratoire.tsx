@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTableauxFilter } from '../context/TableauxFilterContext';
 import TableAnalysesLaboratoire from '../components/Tables/TableAnalysesLaboratoire';
 import TableReformateurCatalytique from '../components/Tables/TableReformateurCatalytique';
 import TableMouvementDesBacs from '../components/Tables/TableMouvementDesBacs';
@@ -44,6 +45,7 @@ const TABLEAU_FILTER_OPTIONS = [
   'Atm/merox & pré flash',
   'Compresseur K 245',
   'Compresseur K 244',
+  'Tout',
 ] as const;
 
 const CHEVRON_DOWN = (
@@ -54,13 +56,17 @@ const CHEVRON_DOWN = (
 
 const AnalysesLaboratoire = () => {
   const [searchParams] = useSearchParams();
+  const showAllTables = searchParams.get('tableau') === 'Tout';
   const [data, setData] = useState<AnalyseRow[]>(() => createInitialAnalysesData());
   const tableauFromUrl = searchParams.get('tableau');
   const initialTableau = tableauFromUrl && TABLEAU_FILTER_OPTIONS.includes(tableauFromUrl as (typeof TABLEAU_FILTER_OPTIONS)[number])
     ? tableauFromUrl
     : TABLEAU_FILTER_OPTIONS[0];
   const [selectedTableau, setSelectedTableau] = useState<string>(initialTableau);
-  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const tableauxCtx = useTableauxFilter();
+  const [localSelectedDate, setLocalSelectedDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const selectedDate = showAllTables ? tableauxCtx.selectedDate : localSelectedDate;
+  const setSelectedDate = showAllTables ? tableauxCtx.setSelectedDate : setLocalSelectedDate;
   const [loadingAnalyses, setLoadingAnalyses] = useState(false);
   const [reformateurData, setReformateurData] = useState<HourRow[]>(() => createInitialReformateurData());
   const [loadingReformateur, setLoadingReformateur] = useState(false);
@@ -103,7 +109,7 @@ const AnalysesLaboratoire = () => {
   const [analysesDataIsDirty, setAnalysesDataIsDirty] = useState(false);
   const lastSavedAnalysesRef = useRef<AnalyseRow[]>([]);
   useEffect(() => {
-    if (!isAnalysesLabo) return;
+    if (!isAnalysesLabo && !showAllTables) return;
     let cancelled = false;
     setLoadingAnalyses(true);
     fetchAnalysesByDate(selectedDate)
@@ -127,14 +133,14 @@ const AnalysesLaboratoire = () => {
         if (!cancelled) setLoadingAnalyses(false);
       });
     return () => { cancelled = true; };
-  }, [isAnalysesLabo, selectedDate]);
+  }, [isAnalysesLabo, showAllTables, selectedDate]);
 
   // Charger les données du backend pour « Réformateur catalytique »
   const isReformateurTableau = selectedTableau === 'Réformateur catalytique';
   const [reformateurDataIsDirty, setReformateurDataIsDirty] = useState(false);
   const lastSavedReformateurRef = useRef<HourRow[]>([]);
   useEffect(() => {
-    if (!isReformateurTableau) return;
+    if (!isReformateurTableau && !showAllTables) return;
     let cancelled = false;
     setLoadingReformateur(true);
     fetchReformateurByDate(selectedDate)
@@ -158,14 +164,14 @@ const AnalysesLaboratoire = () => {
         if (!cancelled) setLoadingReformateur(false);
       });
     return () => { cancelled = true; };
-  }, [isReformateurTableau, selectedDate]);
+  }, [isReformateurTableau, showAllTables, selectedDate]);
 
   // Charger les données du backend pour « Production »
   const isProductionTableau = selectedTableau === 'Production';
   const [productionDataIsDirty, setProductionDataIsDirty] = useState(false);
   const lastSavedProductionRef = useRef<ProductionHourRow[]>([]);
   useEffect(() => {
-    if (!isProductionTableau) return;
+    if (!isProductionTableau && !showAllTables) return;
     let cancelled = false;
     setLoadingProduction(true);
     fetchProductionByDate(selectedDate)
@@ -189,14 +195,14 @@ const AnalysesLaboratoire = () => {
         if (!cancelled) setLoadingProduction(false);
       });
     return () => { cancelled = true; };
-  }, [isProductionTableau, selectedDate]);
+  }, [isProductionTableau, showAllTables, selectedDate]);
 
   // Charger les données du backend pour « Atm/merox & pré flash »
   const isAtmMeroxTableau = selectedTableau === 'Atm/merox & pré flash';
   const [atmMeroxDataIsDirty, setAtmMeroxDataIsDirty] = useState(false);
   const lastSavedAtmMeroxRef = useRef<AtmMeroxHourRow[]>([]);
   useEffect(() => {
-    if (!isAtmMeroxTableau) return;
+    if (!isAtmMeroxTableau && !showAllTables) return;
     let cancelled = false;
     setLoadingAtmMerox(true);
     fetchAtmMeroxByDate(selectedDate)
@@ -220,14 +226,14 @@ const AnalysesLaboratoire = () => {
         if (!cancelled) setLoadingAtmMerox(false);
       });
     return () => { cancelled = true; };
-  }, [isAtmMeroxTableau, selectedDate]);
+  }, [isAtmMeroxTableau, showAllTables, selectedDate]);
 
   // Charger les données du backend pour « Compresseur K 245 »
   const isCompresseurK245Tableau = selectedTableau === 'Compresseur K 245';
   const [compresseurK245DataIsDirty, setCompresseurK245DataIsDirty] = useState(false);
   const lastSavedCompresseurK245Ref = useRef<CompresseurK245HourRow[]>([]);
   useEffect(() => {
-    if (!isCompresseurK245Tableau) return;
+    if (!isCompresseurK245Tableau && !showAllTables) return;
     let cancelled = false;
     setLoadingCompresseurK245(true);
     fetchCompresseurK245ByDate(selectedDate)
@@ -251,14 +257,14 @@ const AnalysesLaboratoire = () => {
         if (!cancelled) setLoadingCompresseurK245(false);
       });
     return () => { cancelled = true; };
-  }, [isCompresseurK245Tableau, selectedDate]);
+  }, [isCompresseurK245Tableau, showAllTables, selectedDate]);
 
   // Charger les données du backend pour « Compresseur K 244 »
   const isCompresseurK244Tableau = selectedTableau === 'Compresseur K 244';
   const [compresseurK244DataIsDirty, setCompresseurK244DataIsDirty] = useState(false);
   const lastSavedCompresseurK244Ref = useRef<CompresseurK244HourRow[]>([]);
   useEffect(() => {
-    if (!isCompresseurK244Tableau) return;
+    if (!isCompresseurK244Tableau && !showAllTables) return;
     let cancelled = false;
     setLoadingCompresseurK244(true);
     fetchCompresseurK244ByDate(selectedDate)
@@ -282,14 +288,14 @@ const AnalysesLaboratoire = () => {
         if (!cancelled) setLoadingCompresseurK244(false);
       });
     return () => { cancelled = true; };
-  }, [isCompresseurK244Tableau, selectedDate]);
+  }, [isCompresseurK244Tableau, showAllTables, selectedDate]);
 
   // Charger les données du backend pour « Gaz »
   const isGazTableau = selectedTableau === 'Gaz';
   const [gazDataIsDirty, setGazDataIsDirty] = useState(false);
   const lastSavedGazRef = useRef<GazHourRow[]>([]);
   useEffect(() => {
-    if (!isGazTableau) return;
+    if (!isGazTableau && !showAllTables) return;
     let cancelled = false;
     setLoadingGaz(true);
     fetchGazByDate(selectedDate)
@@ -313,7 +319,7 @@ const AnalysesLaboratoire = () => {
         if (!cancelled) setLoadingGaz(false);
       });
     return () => { cancelled = true; };
-  }, [isGazTableau, selectedDate]);
+  }, [isGazTableau, showAllTables, selectedDate]);
 
   // Charger les types de bacs (une fois) pour Mouvement des bacs
   useEffect(() => {
@@ -331,7 +337,7 @@ const AnalysesLaboratoire = () => {
   const [mouvementBacsDataIsDirty, setMouvementBacsDataIsDirty] = useState(false);
   const lastSavedMouvementBacsRef = useRef<HourRowWithBacs[]>([]);
   useEffect(() => {
-    if (!isMouvementDesBacsTableau) return;
+    if (!isMouvementDesBacsTableau && !showAllTables) return;
     let cancelled = false;
     setLoadingMouvementBacs(true);
     fetchMouvementBacsByDate(selectedDate)
@@ -358,7 +364,7 @@ const AnalysesLaboratoire = () => {
         if (!cancelled) setLoadingMouvementBacs(false);
       });
     return () => { cancelled = true; };
-  }, [isMouvementDesBacsTableau, selectedDate]);
+  }, [isMouvementDesBacsTableau, showAllTables, selectedDate]);
 
   const [savingAnalyses, setSavingAnalyses] = useState(false);
   const handleAnalysesDataChange = useCallback((newData: AnalyseRow[]) => {
@@ -366,7 +372,7 @@ const AnalysesLaboratoire = () => {
     setAnalysesDataIsDirty(true);
   }, []);
   const handleAnalysesValidate = useCallback(() => {
-    if (!isAnalysesLabo) return;
+    if (!isAnalysesLabo && !showAllTables) return;
     setSavingAnalyses(true);
     saveAnalysesBulk(selectedDate, data)
       .then(() => {
@@ -374,7 +380,7 @@ const AnalysesLaboratoire = () => {
         setAnalysesDataIsDirty(false);
       })
       .finally(() => setSavingAnalyses(false));
-  }, [isAnalysesLabo, selectedDate, data]);
+  }, [isAnalysesLabo, showAllTables, selectedDate, data]);
 
   const [savingReformateur, setSavingReformateur] = useState(false);
   const handleReformateurDataChange = useCallback((newData: HourRow[]) => {
@@ -382,7 +388,7 @@ const AnalysesLaboratoire = () => {
     setReformateurDataIsDirty(true);
   }, []);
   const handleReformateurValidate = useCallback(() => {
-    if (!isReformateurTableau) return;
+    if (!isReformateurTableau && !showAllTables) return;
     setSavingReformateur(true);
     saveReformateurBulk(selectedDate, reformateurData)
       .then(() => {
@@ -390,7 +396,7 @@ const AnalysesLaboratoire = () => {
         setReformateurDataIsDirty(false);
       })
       .finally(() => setSavingReformateur(false));
-  }, [isReformateurTableau, selectedDate, reformateurData]);
+  }, [isReformateurTableau, showAllTables, selectedDate, reformateurData]);
 
   const [savingProduction, setSavingProduction] = useState(false);
   const handleProductionDataChange = useCallback((newData: ProductionHourRow[]) => {
@@ -398,7 +404,7 @@ const AnalysesLaboratoire = () => {
     setProductionDataIsDirty(true);
   }, []);
   const handleProductionValidate = useCallback(() => {
-    if (!isProductionTableau) return;
+    if (!isProductionTableau && !showAllTables) return;
     setSavingProduction(true);
     saveProductionBulk(selectedDate, productionData)
       .then(() => {
@@ -406,7 +412,7 @@ const AnalysesLaboratoire = () => {
         setProductionDataIsDirty(false);
       })
       .finally(() => setSavingProduction(false));
-  }, [isProductionTableau, selectedDate, productionData]);
+  }, [isProductionTableau, showAllTables, selectedDate, productionData]);
 
   const [savingAtmMerox, setSavingAtmMerox] = useState(false);
   const handleAtmMeroxDataChange = useCallback((newData: AtmMeroxHourRow[]) => {
@@ -414,7 +420,7 @@ const AnalysesLaboratoire = () => {
     setAtmMeroxDataIsDirty(true);
   }, []);
   const handleAtmMeroxValidate = useCallback(() => {
-    if (!isAtmMeroxTableau) return;
+    if (!isAtmMeroxTableau && !showAllTables) return;
     setSavingAtmMerox(true);
     saveAtmMeroxBulk(selectedDate, atmMeroxData)
       .then(() => {
@@ -430,7 +436,7 @@ const AnalysesLaboratoire = () => {
     setCompresseurK245DataIsDirty(true);
   }, []);
   const handleCompresseurK245Validate = useCallback(() => {
-    if (!isCompresseurK245Tableau) return;
+    if (!isCompresseurK245Tableau && !showAllTables) return;
     setSavingCompresseurK245(true);
     saveCompresseurK245Bulk(selectedDate, compresseurK245Data)
       .then(() => {
@@ -446,7 +452,7 @@ const AnalysesLaboratoire = () => {
     setCompresseurK244DataIsDirty(true);
   }, []);
   const handleCompresseurK244Validate = useCallback(() => {
-    if (!isCompresseurK244Tableau) return;
+    if (!isCompresseurK244Tableau && !showAllTables) return;
     setSavingCompresseurK244(true);
     saveCompresseurK244Bulk(selectedDate, compresseurK244Data)
       .then(() => {
@@ -462,7 +468,7 @@ const AnalysesLaboratoire = () => {
     setGazDataIsDirty(true);
   }, []);
   const handleGazValidate = useCallback(() => {
-    if (!isGazTableau) return;
+    if (!isGazTableau && !showAllTables) return;
     setSavingGaz(true);
     saveGazBulk(selectedDate, gazData)
       .then(() => {
@@ -487,7 +493,7 @@ const AnalysesLaboratoire = () => {
     []
   );
   const handleMouvementBacsValidate = useCallback(() => {
-    if (!isMouvementDesBacsTableau) return;
+    if (!isMouvementDesBacsTableau && !showAllTables) return;
     setSavingMouvementBacs(true);
     const rowsToSave = mouvementBacsData.map((r) => ({ ...r, bacs: mouvementBacsBacs }));
     saveMouvementBacsBulk(selectedDate, rowsToSave)
@@ -585,6 +591,8 @@ const AnalysesLaboratoire = () => {
         saving={savingReformateur}
         showValidateButton={reformateurDataIsDirty}
         lastSavedData={lastSavedReformateurRef.current}
+        sectionTitle="Tableau — Réformateur catalytique"
+        showInlineDate
       />
     </div>
   ) : isMouvementDesBacs ? (
@@ -601,6 +609,8 @@ const AnalysesLaboratoire = () => {
         showValidateButton={mouvementBacsDataIsDirty}
         bacTypesOptions={bacTypesOptions}
         lastSavedData={lastSavedMouvementBacsRef.current}
+        sectionTitle="Tableau — Mouvement des bacs"
+        showInlineDate
       />
     </div>
   ) : isProduction ? (
@@ -615,6 +625,8 @@ const AnalysesLaboratoire = () => {
         saving={savingProduction}
         showValidateButton={productionDataIsDirty}
         lastSavedData={lastSavedProductionRef.current}
+        sectionTitle="Tableau — Production"
+        showInlineDate
       />
     </div>
   ) : isGaz ? (
@@ -629,6 +641,8 @@ const AnalysesLaboratoire = () => {
         saving={savingGaz}
         showValidateButton={gazDataIsDirty}
         lastSavedData={lastSavedGazRef.current}
+        sectionTitle="Tableau — Gaz"
+        showInlineDate
       />
     </div>
   ) : isCompresseurK245 ? (
@@ -643,6 +657,8 @@ const AnalysesLaboratoire = () => {
         saving={savingCompresseurK245}
         showValidateButton={compresseurK245DataIsDirty}
         lastSavedData={lastSavedCompresseurK245Ref.current}
+        sectionTitle="Tableau — Compresseur K 245"
+        showInlineDate
       />
     </div>
   ) : isCompresseurK244 ? (
@@ -657,6 +673,8 @@ const AnalysesLaboratoire = () => {
         saving={savingCompresseurK244}
         showValidateButton={compresseurK244DataIsDirty}
         lastSavedData={lastSavedCompresseurK244Ref.current}
+        sectionTitle="Tableau — Compresseur K 244"
+        showInlineDate
       />
     </div>
   ) : isAtmMeroxPreFlash ? (
@@ -671,126 +689,250 @@ const AnalysesLaboratoire = () => {
         saving={savingAtmMerox}
         showValidateButton={atmMeroxDataIsDirty}
         lastSavedData={lastSavedAtmMeroxRef.current}
+        sectionTitle="Tableau — Atm/merox & pré flash"
+        showInlineDate
       />
     </div>
   ) : (
-    <TableAnalysesLaboratoire data={data} onDataChange={handleAnalysesDataChange} selectedDate={selectedDate} onDateChange={setSelectedDate} loading={loadingAnalyses} onValidate={handleAnalysesValidate} saving={savingAnalyses} showValidateButton={analysesDataIsDirty} lastSavedData={lastSavedAnalysesRef.current} />
+    <TableAnalysesLaboratoire data={data} onDataChange={handleAnalysesDataChange} selectedDate={selectedDate} onDateChange={setSelectedDate} loading={loadingAnalyses} onValidate={handleAnalysesValidate} saving={savingAnalyses} showValidateButton={analysesDataIsDirty} lastSavedData={lastSavedAnalysesRef.current} sectionTitle="Tableau — Analyses du laboratoire" showInlineDate />
   );
+
+
+  if (showAllTables) {
+    return (
+      <div className="flex flex-col gap-10 pt-14">
+
+        {/* Réformateur catalytique — premier tableau après la navbar */}
+        <div className="-mt-4 flex flex-col gap-6 overflow-visible">
+          <div className="flex min-w-0 flex-col overflow-visible">
+            <div className="flex min-w-0 flex-col">
+              <TableReformateurCatalytique
+                data={reformateurData}
+                onDataChange={handleReformateurDataChange}
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+                loading={loadingReformateur}
+                onValidate={handleReformateurValidate}
+                saving={savingReformateur}
+                showValidateButton={reformateurDataIsDirty}
+                lastSavedData={lastSavedReformateurRef.current}
+                sectionTitle="Tableau — Réformateur catalytique"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Production */}
+        <div className="flex flex-col gap-6 overflow-visible">
+          <div className="flex min-w-0 flex-col overflow-visible">
+            <div className="flex min-w-0 flex-col">
+              <TableProductionValeurElectricite
+                data={productionData}
+                onDataChange={handleProductionDataChange}
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+                loading={loadingProduction}
+                onValidate={handleProductionValidate}
+                saving={savingProduction}
+                showValidateButton={productionDataIsDirty}
+                lastSavedData={lastSavedProductionRef.current}
+                sectionTitle="Tableau — Production"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Gaz */}
+        <div className="flex flex-col gap-6 overflow-visible">
+          <div className="flex min-w-0 flex-col items-center overflow-visible">
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+              <TableGaz
+                data={gazData}
+                onDataChange={handleGazDataChange}
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+                loading={loadingGaz}
+                onValidate={handleGazValidate}
+                saving={savingGaz}
+                showValidateButton={gazDataIsDirty}
+                lastSavedData={lastSavedGazRef.current}
+                sectionTitle="Tableau — Gaz"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Mouvement des bacs */}
+        <div className="flex flex-col gap-6 overflow-visible">
+          <div className="flex min-w-0 flex-col items-center overflow-visible">
+            <div className="flex min-w-0 w-full max-w-full flex-col overflow-visible">
+              <TableMouvementDesBacs
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+                data={mouvementBacsTableData}
+                onDataChange={handleMouvementBacsDataChange}
+                bacTypeByProduct={mouvementBacsBacs}
+                loading={loadingMouvementBacs}
+                onValidate={handleMouvementBacsValidate}
+                saving={savingMouvementBacs}
+                showValidateButton={mouvementBacsDataIsDirty}
+                bacTypesOptions={bacTypesOptions}
+                lastSavedData={lastSavedMouvementBacsRef.current}
+                sectionTitle="Tableau — Mouvement des bacs"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Atm/merox & pré flash */}
+        <div className="flex flex-col gap-6 overflow-visible">
+          <div className="flex min-w-0 flex-col overflow-visible">
+            <div className="flex min-w-0 flex-col">
+              <TableAtmMeroxPreFlash
+                data={atmMeroxData}
+                onDataChange={handleAtmMeroxDataChange}
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+                loading={loadingAtmMerox}
+                onValidate={handleAtmMeroxValidate}
+                saving={savingAtmMerox}
+                showValidateButton={atmMeroxDataIsDirty}
+                lastSavedData={lastSavedAtmMeroxRef.current}
+                sectionTitle="Tableau — Atm/merox & pré flash"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Compresseur K 245 */}
+        <div className="flex flex-col gap-6 overflow-visible">
+          <div className="flex min-w-0 flex-col overflow-visible">
+            <div className="flex min-w-0 flex-col">
+              <TableCompresseurK245
+                data={compresseurK245Data}
+                onDataChange={handleCompresseurK245DataChange}
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+                loading={loadingCompresseurK245}
+                onValidate={handleCompresseurK245Validate}
+                saving={savingCompresseurK245}
+                showValidateButton={compresseurK245DataIsDirty}
+                lastSavedData={lastSavedCompresseurK245Ref.current}
+                sectionTitle="Tableau — Compresseur K 245"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Compresseur K 244 */}
+        <div className="flex flex-col gap-6 overflow-visible">
+          <div className="flex min-w-0 flex-col overflow-visible">
+            <div className="flex min-w-0 flex-col">
+              <TableCompresseurK244
+                data={compresseurK244Data}
+                onDataChange={handleCompresseurK244DataChange}
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+                loading={loadingCompresseurK244}
+                onValidate={handleCompresseurK244Validate}
+                saving={savingCompresseurK244}
+                showValidateButton={compresseurK244DataIsDirty}
+                lastSavedData={lastSavedCompresseurK244Ref.current}
+                sectionTitle="Tableau — Compresseur K 244"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Analyses du laboratoire — dernier tableau en bas de page, toutes les lignes visibles sans scroll interne */}
+        <div className="flex flex-col gap-6 overflow-visible">
+          <div className="flex min-w-0 flex-col overflow-visible">
+            <TableAnalysesLaboratoire
+              data={data}
+              onDataChange={handleAnalysesDataChange}
+              selectedDate={selectedDate}
+              onDateChange={setSelectedDate}
+              loading={loadingAnalyses}
+              onValidate={handleAnalysesValidate}
+              saving={savingAnalyses}
+              showValidateButton={analysesDataIsDirty}
+              lastSavedData={lastSavedAnalysesRef.current}
+              allRowsVisible
+              sectionTitle="Tableau — Analyses du laboratoire"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isGaz) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden">
-        <div className="flex-shrink-0 border-b border-stroke/60 px-6 py-5 dark:border-strokedark/80">
-          {headerBlock}
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col items-center overflow-hidden">
-          {tableContent}
-        </div>
+      <div className="flex min-h-0 flex-1 flex-col items-center overflow-hidden pt-6">
+        {tableContent}
       </div>
     );
   }
 
   if (isAnalysesLabo) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden">
-        <div className="flex-shrink-0 border-b border-stroke/60 px-6 py-5 dark:border-strokedark/80">
-          {headerBlock}
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          {tableContent}
-        </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-6">
+        {tableContent}
       </div>
     );
   }
 
   if (isReformateur) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-visible">
-        <div className="flex-shrink-0 border-b border-stroke/60 px-6 py-5 dark:border-strokedark/80">
-          {headerBlock}
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col overflow-visible">
-          {tableContent}
-        </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-visible pt-6">
+        {tableContent}
       </div>
     );
   }
 
   if (isMouvementDesBacs) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden">
-        <div className="flex-shrink-0 border-b border-stroke/60 px-6 py-5 dark:border-strokedark/80">
-          {headerBlock}
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col items-center overflow-hidden">
-          {tableContent}
-        </div>
+      <div className="flex min-h-0 flex-1 flex-col items-center overflow-hidden pt-6">
+        {tableContent}
       </div>
     );
   }
 
   if (isProduction) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-visible">
-        <div className="flex-shrink-0 border-b border-stroke/60 px-6 py-5 dark:border-strokedark/80">
-          {headerBlock}
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col overflow-visible">
-          {tableContent}
-        </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-visible pt-6">
+        {tableContent}
       </div>
     );
   }
 
   if (isCompresseurK245) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-visible">
-        <div className="flex-shrink-0 border-b border-stroke/60 px-6 py-5 dark:border-strokedark/80">
-          {headerBlock}
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col overflow-visible">
-          {tableContent}
-        </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-visible pt-6">
+        {tableContent}
       </div>
     );
   }
 
   if (isCompresseurK244) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-visible">
-        <div className="flex-shrink-0 border-b border-stroke/60 px-6 py-5 dark:border-strokedark/80">
-          {headerBlock}
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col overflow-visible">
-          {tableContent}
-        </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-visible pt-6">
+        {tableContent}
       </div>
     );
   }
 
   if (isAtmMeroxPreFlash) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-visible">
-        <div className="flex-shrink-0 border-b border-stroke/60 px-6 py-5 dark:border-strokedark/80">
-          {headerBlock}
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col overflow-visible">
-          {tableContent}
-        </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-visible pt-6">
+        {tableContent}
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden">
-      <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-stroke bg-gradient-to-br from-sky-50 to-indigo-50 shadow-lg dark:border-strokedark dark:from-boxdark dark:to-meta-4">
-        <div className="flex-shrink-0 border-b border-stroke/60 px-6 py-5 dark:border-strokedark/80">
-          {headerBlock}
-        </div>
-        <div className={`flex w-full flex-col overflow-hidden p-6 ${isContentSizedTable ? 'min-w-0' : 'min-h-0 flex-1'}`}>
-          {tableContent}
-        </div>
-      </div>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-6">
+      {tableContent}
     </div>
   );
 };

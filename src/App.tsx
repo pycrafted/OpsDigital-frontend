@@ -11,10 +11,30 @@ import ECommerce from './pages/Dashboard/ECommerce';
 import Settings from './pages/Settings';
 import AnalysesLaboratoire from './pages/AnalysesLaboratoire';
 import AnalysesLaboratoireGraphique from './pages/AnalysesLaboratoireGraphique';
-import Saisie from './pages/Saisie';
 import SaisieFeuillePage from './pages/SaisieFeuillePage';
+import SaisieTousPage from './pages/SaisieTousPage';
 import Profile from './pages/Profile';
 import DefaultLayout from './layout/DefaultLayout';
+import { AnalysesLaboLabelsProvider } from './context/AnalysesLaboLabelsContext';
+import { AnalysesLaboBoundsProvider } from './context/AnalysesLaboBoundsContext';
+import { AtmMeroxLabelsProvider } from './context/AtmMeroxLabelsContext';
+import { AtmMeroxBoundsProvider } from './context/AtmMeroxBoundsContext';
+import { CompresseurK244LabelsProvider } from './context/CompresseurK244LabelsContext';
+import { CompresseurK244BoundsProvider } from './context/CompresseurK244BoundsContext';
+import { CompresseurK245LabelsProvider } from './context/CompresseurK245LabelsContext';
+import { CompresseurK245BoundsProvider } from './context/CompresseurK245BoundsContext';
+import { GazLabelsProvider } from './context/GazLabelsContext';
+import { GazBoundsProvider } from './context/GazBoundsContext';
+import { MouvementBacsLabelsProvider } from './context/MouvementBacsLabelsContext';
+import { MouvementBacsBoundsProvider } from './context/MouvementBacsBoundsContext';
+import { ProductionLabelsProvider } from './context/ProductionLabelsContext';
+import { ProductionBoundsProvider } from './context/ProductionBoundsContext';
+import { ReformateurLabelsProvider } from './context/ReformateurLabelsContext';
+import { ReformateurBoundsProvider } from './context/ReformateurBoundsContext';
+import { TableViewProvider } from './context/TableViewContext';
+import { SaisieFilterProvider } from './context/SaisieFilterContext';
+import { GraphiqueFilterProvider } from './context/GraphiqueFilterContext';
+import { TableauxFilterProvider } from './context/TableauxFilterContext';
 
 function App() {
   const [loading, setLoading] = useState<boolean>(true);
@@ -63,6 +83,26 @@ function App() {
       {/* Pages protégées : connexion requise */}
       <Route path="/*" element={
         <ProtectedRoute>
+          <AnalysesLaboLabelsProvider>
+          <AnalysesLaboBoundsProvider>
+          <AtmMeroxLabelsProvider>
+          <AtmMeroxBoundsProvider>
+          <CompresseurK244LabelsProvider>
+          <CompresseurK244BoundsProvider>
+          <CompresseurK245LabelsProvider>
+          <CompresseurK245BoundsProvider>
+          <GazLabelsProvider>
+          <GazBoundsProvider>
+          <MouvementBacsLabelsProvider>
+          <MouvementBacsBoundsProvider>
+          <ProductionLabelsProvider>
+          <ProductionBoundsProvider>
+          <ReformateurLabelsProvider>
+          <ReformateurBoundsProvider>
+          <TableViewProvider>
+          <SaisieFilterProvider>
+          <GraphiqueFilterProvider>
+          <TableauxFilterProvider>
           <DefaultLayout>
             <Routes>
         <Route
@@ -84,7 +124,8 @@ function App() {
             </>
           }
         />
-        <Route path="/saisie" element={<Navigate to="/saisie/reformateur-catalytique" replace />} />
+        <Route path="/saisie" element={<Navigate to="/saisie/tous" replace />} />
+        <Route path="/saisie/tous" element={<><PageTitle /><SaisieTousPage /></>} />
         <Route
           path="/saisie/:feuilleId"
           element={<SaisieFeuillePage />}
@@ -171,6 +212,15 @@ function App() {
           }
         />
         <Route
+          path="/graphique/tous"
+          element={
+            <>
+              <PageTitle />
+              <AnalysesLaboratoireGraphique />
+            </>
+          }
+        />
+        <Route
           path="/profile"
           element={
             <>
@@ -190,6 +240,26 @@ function App() {
         />
       </Routes>
           </DefaultLayout>
+          </TableauxFilterProvider>
+          </GraphiqueFilterProvider>
+          </SaisieFilterProvider>
+          </TableViewProvider>
+          </ReformateurBoundsProvider>
+          </ReformateurLabelsProvider>
+          </ProductionBoundsProvider>
+          </ProductionLabelsProvider>
+          </MouvementBacsBoundsProvider>
+          </MouvementBacsLabelsProvider>
+          </GazBoundsProvider>
+          </GazLabelsProvider>
+          </CompresseurK245BoundsProvider>
+          </CompresseurK245LabelsProvider>
+          </CompresseurK244BoundsProvider>
+          </CompresseurK244LabelsProvider>
+          </AtmMeroxBoundsProvider>
+          </AtmMeroxLabelsProvider>
+          </AnalysesLaboBoundsProvider>
+          </AnalysesLaboLabelsProvider>
         </ProtectedRoute>
       } />
     </Routes>

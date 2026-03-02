@@ -6,6 +6,9 @@ import {
   type GazColumnKey,
   type GazHourKey,
 } from '../../data/gaz';
+import { useGazLabels } from '../../context/GazLabelsContext';
+import { useGazBounds } from '../../context/GazBoundsContext';
+import { useTableView } from '../../context/TableViewContext';
 
 const CHEVRON_DOWN = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden>
@@ -31,11 +34,14 @@ const LOCK_OPEN = (
   </svg>
 );
 
-const VALIDATE_ICON = (
-  <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
-    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-  </svg>
-);
+
+/** Pour l’affichage : "15.0" → "15", "15.2" → "15.2" (sans .0 inutile). */
+function formatDisplayValue(val: string): string {
+  if (val === '' || val == null) return '';
+  const n = parseFloat(String(val).replace(',', '.'));
+  if (Number.isNaN(n)) return val;
+  return Number.isInteger(n) ? String(n) : String(n);
+}
 
 export interface TableGazProps {
   data: HourRow[];
@@ -47,19 +53,27 @@ export interface TableGazProps {
   saving?: boolean;
   showValidateButton?: boolean;
   lastSavedData?: HourRow[] | null;
+  sectionTitle?: string;
+  showInlineDate?: boolean;
 }
 
 const TableGaz = ({
   data,
   onDataChange,
-  selectedDate: _selectedDate,
-  onDateChange: _onDateChange,
+  selectedDate,
+  onDateChange,
   loading = false,
   onValidate,
   saving = false,
   showValidateButton = false,
   lastSavedData = null,
+  sectionTitle,
+  showInlineDate = false,
 }: TableGazProps) => {
+  const { getHourLabel, getColumnTitle, getColumnSubtitle } = useGazLabels();
+  const { isOutOfBounds } = useGazBounds();
+  const { hideEmptyColumns } = useTableView();
+
   const [selectedRows, setSelectedRows] = React.useState<GazHourKey[]>(() => [...rows]);
   const [selectedColumnKeys, setSelectedColumnKeys] = React.useState<GazColumnKey[]>(() => columns.map((c) => c.key));
   const [canEdit, setCanEdit] = React.useState(false);
@@ -70,8 +84,11 @@ const TableGaz = ({
   const columnDropdownRef = React.useRef<HTMLDivElement>(null);
   const columnTriggerRef = React.useRef<HTMLButtonElement>(null);
   const tableRef = React.useRef<HTMLTableElement>(null);
+  /** Cellule en cours d’édition : on affiche la valeur brute pour permettre de saisir "14.5" (le point). */
+  const [focusedCell, setFocusedCell] = React.useState<{ rowHour: GazHourKey; col: GazColumnKey } | null>(null);
 
   const handleChange = (rowHour: GazHourKey, col: GazColumnKey, value: string) => {
+    if (value !== '' && !/^-?\d*[.,]?\d*$/.test(value)) return;
     const idx = data.findIndex((r) => r.hour === rowHour);
     if (idx === -1) return;
     const newData = [...data];
@@ -95,9 +112,18 @@ const TableGaz = ({
 
   const filteredRows = rows.filter((r) => selectedRows.includes(r));
   const filteredColumns = columns.filter((c) => selectedColumnKeys.includes(c.key));
+  const visibleColumns = hideEmptyColumns
+    ? filteredColumns.filter((col) =>
+        filteredRows.some((rowHour) => {
+          const rowData = data.find((r) => r.hour === rowHour);
+          const val = rowData?.values[col.key];
+          return val !== '' && val != null;
+        })
+      )
+    : filteredColumns;
 
   const totalRows = filteredRows.length;
-  const totalCols = filteredColumns.length;
+  const totalCols = visibleColumns.length;
 
   const handleTableKeyDown = (e: React.KeyboardEvent<HTMLTableElement>) => {
     if (!canEdit) return;
@@ -151,7 +177,7 @@ const TableGaz = ({
   }, []);
 
   const filterTriggerClass =
-    'flex cursor-pointer items-center gap-2 rounded-xl border border-stroke/70 bg-white/90 px-4 py-2.5 text-sm font-medium text-[#3c50e0] shadow-sm transition hover:border-primary/50 hover:bg-white hover:text-primary dark:border-strokedark dark:bg-boxdark dark:text-white dark:hover:border-primary dark:hover:bg-meta-4/80 dark:hover:text-white';
+    'flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white';
   const dropdownPanelClass =
     'absolute left-0 top-full z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark';
 
@@ -163,8 +189,22 @@ const TableGaz = ({
         </div>
       )}
       <div className="flex w-full flex-shrink-0 items-center gap-2">
-        <div className="flex-1" />
+        <div className="flex-1">{sectionTitle && <p className="text-sm font-semibold text-primary dark:text-white">{sectionTitle}</p>}</div>
         <div className="flex flex-wrap items-center justify-center gap-2">
+          {showInlineDate && (
+            <>
+              <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
+                <input
+                  type="date"
+                  value={selectedDate}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => onDateChange(e.target.value)}
+                  className="w-[7.5rem] rounded border-0 bg-transparent py-0.5 text-xs font-bold text-primary outline-none dark:text-white"
+                />
+              </div>
+              <span className="h-4 w-px bg-primary/30" />
+            </>
+          )}
           <div className="relative" ref={rowDropdownRef}>
             <button type="button" ref={rowTriggerRef} onClick={() => setShowRowDropdown(!showRowDropdown)} className={filterTriggerClass}>
               Créneaux
@@ -184,7 +224,7 @@ const TableGaz = ({
                       }`}
                     >
                       {isSelected && CHECK}
-                      {row}
+                      {getHourLabel(row)}
                     </button>
                   );
                 })}
@@ -210,7 +250,7 @@ const TableGaz = ({
                       }`}
                     >
                       {isSelected && CHECK}
-                      <span className={isSelected ? 'font-medium' : ''}>{col.title} — {col.subtitle}</span>
+                      <span className={isSelected ? 'font-medium' : ''}>{getColumnTitle(col.key)} — {getColumnSubtitle(col.key)}</span>
                     </button>
                   );
                 })}
@@ -224,17 +264,23 @@ const TableGaz = ({
               type="button"
               onClick={() => onValidate?.()}
               disabled={saving}
-              className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-stroke/70 bg-white/90 px-3 text-green-600 transition hover:border-green-500 hover:bg-white hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-strokedark dark:bg-boxdark dark:text-green-400 dark:hover:border-green-500 dark:hover:bg-meta-4/80 dark:hover:text-green-300"
-              aria-label="Valider et sauvegarder les modifications"
+              className="rounded bg-primary px-6 py-2 text-sm font-medium text-white transition hover:bg-primary/90 disabled:opacity-70"
+              aria-label="Enregistrer les modifications"
             >
-              {VALIDATE_ICON}
-              <span className="text-sm font-medium text-inherit">{saving ? 'Sauvegarde…' : 'Valider'}</span>
+              {saving ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Enregistrement…
+                </span>
+              ) : (
+                'Enregistrer'
+              )}
             </button>
           )}
           <button
             type="button"
             onClick={() => setCanEdit((prev) => !prev)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-stroke/70 bg-white/90 text-primary transition hover:border-primary/50 hover:bg-white dark:border-strokedark dark:bg-boxdark dark:hover:border-primary dark:hover:bg-meta-4/80 dark:text-primary"
+            className="flex shrink-0 items-center justify-center rounded border border-primary bg-white px-2 py-1 text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white"
             aria-label="Modification directe"
           >
             {canEdit ? LOCK_OPEN : LOCK_CLOSED}
@@ -242,7 +288,7 @@ const TableGaz = ({
         </div>
       </div>
       <div className="inline-block max-h-[calc(100vh-14rem)] w-full max-w-full overflow-auto">
-        <div className="min-h-full w-max">
+        <div className={`min-h-full w-max${hideEmptyColumns ? ' mx-auto' : ''}`}>
           <table
             ref={tableRef}
             className="min-w-full border-collapse table-auto"
@@ -254,12 +300,12 @@ const TableGaz = ({
                   className="sticky left-0 z-20 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 border-t-0 border-l-0 bg-[#eff6ff] py-1.5 pl-2 pr-2 dark:border-strokedark dark:border-t-0 dark:border-l-0 dark:bg-[#273342]"
                   aria-label=""
                 />
-                {filteredColumns.map((col) => (
+                {visibleColumns.map((col) => (
                   <th
                     key={col.key}
-                    className="sticky top-0 z-10 min-w-[6rem] border-b border-r border-stroke/70 bg-primary py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark"
+                    className="sticky top-0 z-10 min-w-[9rem] border-b border-r border-stroke/70 bg-primary py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark"
                   >
-                    {col.title}
+                    {getColumnTitle(col.key)}
                   </th>
                 ))}
               </tr>
@@ -270,13 +316,13 @@ const TableGaz = ({
                 >
                   {''}
                 </th>
-                {filteredColumns.map((col) => (
+                {visibleColumns.map((col) => (
                   <th
                     key={col.key}
-                    className="sticky top-7 z-10 min-w-[6rem] border-b border-r border-stroke/70 bg-primary/95 py-1 px-1.5 text-center text-[11px] font-medium text-white/95 dark:border-strokedark"
+                    className="sticky top-7 z-10 min-w-[9rem] border-b border-r border-stroke/70 bg-primary/95 py-1 px-1.5 text-center text-[11px] font-medium text-white/95 dark:border-strokedark"
                   >
-                    <span className="block truncate" title={col.subtitle}>
-                      {col.subtitle}
+                    <span className="block truncate" title={getColumnSubtitle(col.key)}>
+                      {getColumnSubtitle(col.key)}
                     </span>
                   </th>
                 ))}
@@ -293,30 +339,38 @@ const TableGaz = ({
                     className={`group border-b border-stroke/50 odd:bg-slate-100 even:bg-white transition-colors dark:border-strokedark/70 dark:odd:bg-meta-4/30 dark:even:bg-boxdark ${canEdit ? 'hover:bg-slate-200 dark:hover:bg-meta-4/50' : ''}`}
                   >
                     <td className={`sticky left-0 z-10 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 bg-[#3c50e0] py-1 pl-2 pr-2 text-sm font-medium text-white dark:border-strokedark dark:bg-[#3c50e0] dark:text-white ${canEdit ? 'group-hover:bg-[#3c50e0]/90 dark:group-hover:bg-[#3c50e0]/90' : ''}`}>
-                      <span className="block truncate" title={rowHour}>
-                        {rowHour}
+                      <span className="block truncate" title={getHourLabel(rowHour)}>
+                        {getHourLabel(rowHour)}
                       </span>
                     </td>
-                    {filteredColumns.map((col, colIndex) => {
+                    {visibleColumns.map((col, colIndex) => {
                       const value = values[col.key] ?? '';
                       const savedRow = lastSavedData != null && lastSavedData.length > 0 && originalIndex >= 0 ? lastSavedData[originalIndex] : null;
                       const savedValue = savedRow?.values?.[col.key];
                       const isModified = savedRow != null && savedValue !== value;
+                      const isFocused = focusedCell != null && focusedCell.rowHour === rowHour && focusedCell.col === col.key;
+                      const outOfBounds = isOutOfBounds(col.key, value);
                       return (
                         <td
                           key={col.key}
-                          className={`min-w-[4rem] w-[4rem] border-r border-stroke/50 py-0 px-1 dark:border-strokedark/70 ${isModified ? 'bg-[#24303f] dark:bg-[#f1f5f9]' : 'bg-transparent'}`}
+                          className={`min-w-[9rem] w-[9rem] border-r border-stroke/50 py-0 px-1 dark:border-strokedark/70 ${outOfBounds ? '!bg-red-600 dark:!bg-red-600' : isModified ? 'bg-[#24303f] dark:bg-[#f1f5f9]' : 'bg-transparent'}`}
                         >
                           <input
                             type="text"
-                            value={value}
+                            value={isFocused ? value : formatDisplayValue(value)}
                             readOnly={!canEdit}
+                            onFocus={() => setFocusedCell({ rowHour, col: col.key })}
+                            onBlur={() => setFocusedCell(null)}
+                            inputMode="decimal"
+                            title={outOfBounds ? "Hors normes : valeur en dehors de l'intervalle min/max (paramètres)" : 'Nombre (virgule ou point décimal)'}
                             onChange={(e) => handleChange(rowHour, col.key, e.target.value)}
                             data-cell="true"
                             data-row={rowIndex}
                             data-col={colIndex}
                             className={`w-full py-1 pr-2 text-right text-sm font-medium outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 ${
-                              isModified
+                              outOfBounds
+                                ? '!bg-red-600 !text-white placeholder:!text-white/70 dark:!bg-red-600 dark:!text-white'
+                                : isModified
                                 ? 'bg-[#24303f] text-white placeholder:text-white/50 dark:bg-[#f1f5f9] dark:text-black dark:placeholder:text-black/50'
                                 : 'bg-transparent ' + (canEdit
                                   ? 'text-slate-800 focus:ring-2 focus:ring-primary/20 dark:text-slate-200'

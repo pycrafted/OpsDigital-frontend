@@ -46,8 +46,24 @@ const HOUR_LABELS: Record<string, string> = {
   h3: '3h',
 };
 
+/** Pour l’affichage : "15.0" → "15", "15.2" → "15.2" (sans .0 inutile). */
+function formatDisplayValue(val: string): string {
+  if (val === '' || val == null) return '';
+  const n = parseFloat(String(val).replace(',', '.'));
+  if (Number.isNaN(n)) return val;
+  return Number.isInteger(n) ? String(n) : String(n);
+}
+
 interface FormulaireSaisieFeuilleProps {
   feuille: FeuilleConfig;
+  /** Quand fourni (mode "Tout"), utilise cette date et masque le sélecteur de date. */
+  externalDate?: string;
+  /** Quand fourni (mode "Tout"), utilise cette heure et masque le sélecteur d'heure. */
+  externalHour?: string;
+  /** Désactive le focus automatique sur le premier champ (utile en mode "Tout"). */
+  disableAutoFocus?: boolean;
+  /** Masque le trait séparateur au-dessus (premier formulaire de la liste). */
+  hideSeparator?: boolean;
 }
 
 const LABELS_K244: Record<string, string> = {
@@ -58,16 +74,40 @@ const LABELS_K244: Record<string, string> = {
   'moteur k244': 'Moteur K244',
 };
 
+/** Retourne le créneau horaire correspondant à l'heure réelle actuelle. */
+function getCurrentHourSlot(availableHours: string[]): string {
+  const h = new Date().getHours();
+  let slot: string;
+  if (h >= 7 && h < 11) slot = 'h7';
+  else if (h >= 11 && h < 15) slot = 'h11';
+  else if (h >= 15 && h < 19) slot = 'h15';
+  else if (h >= 19 && h < 23) slot = 'h19';
+  else if (h >= 23 || h < 3) slot = 'h23';
+  else slot = 'h3';
+  return availableHours.includes(slot) ? slot : availableHours[0];
+}
+
 const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
   feuille,
+  externalDate,
+  externalHour,
+  disableAutoFocus = false,
+  hideSeparator = false,
 }) => {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const [date, setDate] = useState(today);
-  const [hour, setHour] = useState(feuille.hours[0]);
+  const [internalDate, setInternalDate] = useState(today);
+  const date = externalDate ?? internalDate;
+  const setDate = (d: string) => { if (!externalDate) setInternalDate(d); };
+  const [internalHour, setInternalHour] = useState(() => getCurrentHourSlot(feuille.hours));
+  const hour = externalHour ?? internalHour;
+  const setHour = (h: string) => { if (!externalHour) setInternalHour(h); };
   const [values, setValues] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   const [savingBackend, setSavingBackend] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  /** Clé du champ en cours d’édition : on affiche la valeur brute pour permettre de saisir "14.5" (le point). */
+  const [focusedFieldKey, setFocusedFieldKey] = useState<string | null>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
   const [reformateurRows, setReformateurRows] = useState<ReformateurHourRow[] | null>(null);
   const [loadingReformateur, setLoadingReformateur] = useState(false);
@@ -483,10 +523,16 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
     }
   }, [isCompresseurK245, compresseurK245Rows, hour, compresseurK245FormKeyToApi]);
 
+  // Réinitialiser l'état "modifié" quand on change de date ou de créneau
   useEffect(() => {
+    setIsDirty(false);
+  }, [date, hour]);
+
+  useEffect(() => {
+    if (disableAutoFocus) return;
     const t = setTimeout(() => firstInputRef.current?.focus(), 100);
     return () => clearTimeout(t);
-  }, [feuille.id, date, hour, selectedCategory]);
+  }, [feuille.id, date, hour, selectedCategory, disableAutoFocus]);
 
   const doSave = useCallback(() => {
     if (isReformateurCatalytique) {
@@ -497,6 +543,7 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
       saveReformateurBulk(date, reformateurRows)
         .then(() => {
           setSaved(true);
+          setIsDirty(false);
           setTimeout(() => setSaved(false), 2200);
         })
         .catch(() => {
@@ -515,6 +562,7 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
       saveCompresseurK244Bulk(date, compresseurK244Rows)
         .then(() => {
           setSaved(true);
+          setIsDirty(false);
           setTimeout(() => setSaved(false), 2200);
         })
         .catch(() => {
@@ -533,6 +581,7 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
       saveProductionBulk(date, productionRows)
         .then(() => {
           setSaved(true);
+          setIsDirty(false);
           setTimeout(() => setSaved(false), 2200);
         })
         .catch(() => {
@@ -551,6 +600,7 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
       saveGazBulk(date, gazRows)
         .then(() => {
           setSaved(true);
+          setIsDirty(false);
           setTimeout(() => setSaved(false), 2200);
         })
         .catch(() => {
@@ -569,6 +619,7 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
       saveAtmMeroxBulk(date, atmMeroxRows)
         .then(() => {
           setSaved(true);
+          setIsDirty(false);
           setTimeout(() => setSaved(false), 2200);
         })
         .catch(() => {
@@ -587,6 +638,7 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
       saveCompresseurK245Bulk(date, compresseurK245Rows)
         .then(() => {
           setSaved(true);
+          setIsDirty(false);
           setTimeout(() => setSaved(false), 2200);
         })
         .catch(() => {
@@ -599,6 +651,7 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
     }
     saveSaisieToStorage(feuille.id, date, hour, values);
     setSaved(true);
+    setIsDirty(false);
     setTimeout(() => setSaved(false), 2200);
   }, [date, hour, isReformateurCatalytique, isCompresseurK244, isProductionValeurElectricite, isGaz, isAtmMeroxPreflash, isCompresseurK245, feuille.id, reformateurRows, compresseurK244Rows, productionRows, gazRows, atmMeroxRows, compresseurK245Rows, values]);
 
@@ -711,6 +764,7 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
       }
     }
     setSaved(false);
+    setIsDirty(true);
   };
 
   const handleSave = () => {
@@ -773,54 +827,72 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
 
   return (
     <>
+      {externalDate && !hideSeparator && (
+          <div className="pb-2">
+            <hr className="w-full border-t-2 border-white" />
+          </div>
+        )}
       {/* En-tête : directement sur la page */}
-      <div className="border-b border-stroke/60 px-6 py-5 dark:border-strokedark/80">
+      <div className={`px-6 py-4 ${
+        externalDate
+          ? ''
+          : 'border-b border-stroke/60 bg-gradient-to-r from-primary/5 to-transparent dark:border-strokedark/80 dark:from-primary/10 dark:to-transparent'
+      }`}>
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <p className="text-2xl font-semibold text-primary dark:text-white">
-              Saisie — {pageTitle}
-            </p>
+            <div className="flex items-center gap-3">
+              <span className="block h-6 w-1 shrink-0 rounded-full bg-primary" aria-hidden />
+              <p className="text-base font-semibold text-primary dark:text-white">
+                {externalDate ? pageTitle : `Saisie — ${pageTitle}`}
+              </p>
+            </div>
             <div className="flex flex-wrap items-center gap-3">
-              <label className="sr-only" htmlFor="saisie-date">
-                Date
-              </label>
-              <input
-                id="saisie-date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className={filterControlClass}
-              />
-              <div className={`${filterControlClass} gap-0.5 pr-1 pl-2`} role="group" aria-label="Créneau">
-                <button
-                  type="button"
-                  onClick={() => goToCreneau(previousHour)}
-                  className="rounded-lg p-1.5 text-bodydark2 hover:bg-black/5 hover:text-primary dark:hover:bg-white/10 dark:hover:text-white"
-                  title={`Créneau précédent (${HOUR_LABELS[previousHour]})`}
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <span className="min-w-[2.5rem] py-1.5 text-center text-sm font-medium text-primary dark:text-white">
-                  {HOUR_LABELS[hour] ?? hour}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => goToCreneau(nextHour)}
-                  className="rounded-lg p-1.5 text-bodydark2 hover:bg-black/5 hover:text-primary dark:hover:bg-white/10 dark:hover:text-white"
-                  title={`Créneau suivant (${HOUR_LABELS[nextHour]})`}
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
+              {!externalDate && (
+                <>
+                  <label className="sr-only" htmlFor="saisie-date">
+                    Date
+                  </label>
+                  <input
+                    id="saisie-date"
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className={filterControlClass}
+                  />
+                </>
+              )}
+              {!externalHour && (
+                <div className={`${filterControlClass} gap-0.5 pr-1 pl-2`} role="group" aria-label="Créneau">
+                  <button
+                    type="button"
+                    onClick={() => goToCreneau(previousHour)}
+                    className="rounded-lg p-1.5 text-bodydark2 hover:bg-black/5 hover:text-primary dark:hover:bg-white/10 dark:hover:text-white"
+                    title={`Créneau précédent (${HOUR_LABELS[previousHour]})`}
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <span className="min-w-[2.5rem] py-1.5 text-center text-sm font-medium text-primary dark:text-white">
+                    {HOUR_LABELS[hour] ?? hour}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => goToCreneau(nextHour)}
+                    className="rounded-lg p-1.5 text-bodydark2 hover:bg-black/5 hover:text-primary dark:hover:bg-white/10 dark:hover:text-white"
+                    title={`Créneau suivant (${HOUR_LABELS[nextHour]})`}
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
       {/* Zone de saisie : directement sur la page */}
-      <div className="p-6">
+      <div className={`p-6 ${externalDate ? 'pb-2' : ''}`}>
           {orderedCategories.length > 1 && (
             <div className="mb-4 flex flex-wrap gap-2">
               {orderedCategories.map((cat) => {
@@ -853,6 +925,10 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
             {fieldsForSelectedCategory.map(({ label, key }, idx) => {
               const rawValue = values[key] ?? '';
+              const isFocused = focusedFieldKey === key;
+              /** Au focus : afficher la valeur formatée ("56" pas "56.0"), sauf si l’utilisateur tape une décimale (ex. "14."). */
+              const isTypingDecimal = rawValue.endsWith('.') || rawValue.endsWith(',');
+              const displayValue = isFocused && isTypingDecimal ? rawValue : formatDisplayValue(rawValue);
               return (
                 <div
                   key={key}
@@ -868,7 +944,9 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
                     ref={idx === 0 ? firstInputRef : undefined}
                     id={key}
                     type="text"
-                    value={rawValue}
+                    value={displayValue}
+                    onFocus={() => setFocusedFieldKey(key)}
+                    onBlur={() => setFocusedFieldKey(null)}
                     onChange={(e) => handleChange(key, e.target.value)}
                     placeholder="—"
                     className="w-full sm:max-w-xs rounded-lg border border-stroke bg-white py-2 px-3 text-sm text-black placeholder:text-bodydark2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-strokedark dark:bg-meta-4 dark:text-white dark:focus:border-primary"
@@ -877,18 +955,28 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
               );
             })}
           </div>
-          <div className="mt-6 flex justify-end">
-            <button
-              type="button"
-              onClick={handleSave}
-              className={`rounded-xl border px-4 py-2.5 text-sm font-medium shadow-sm transition ${
-                saved
-                  ? 'border-success bg-success text-white'
-                  : 'border-primary bg-primary text-white hover:bg-primary/90 dark:border-primary dark:bg-primary dark:hover:bg-primary/90'
-              }`}
-            >
-              {saved ? 'Enregistré ✓' : 'Enregistrer'}
-            </button>
+          <div
+            className={`overflow-hidden transition-all duration-200 ease-out ${
+              isDirty ? 'mt-6 max-h-16 opacity-100' : 'mt-0 max-h-0 opacity-0'
+            }`}
+          >
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={savingBackend || !isDirty}
+                className="rounded bg-primary px-6 py-2 text-sm font-medium text-white transition hover:bg-primary/90 disabled:opacity-70"
+              >
+                {savingBackend ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Enregistrement…
+                  </span>
+                ) : (
+                  'Enregistrer'
+                )}
+              </button>
+            </div>
           </div>
         </div>
     </>

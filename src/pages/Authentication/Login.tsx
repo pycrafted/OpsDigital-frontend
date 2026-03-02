@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import LogoIcon from '../../images/logo/logo-icon.svg';
 import DarkModeSwitcher from '../../components/Header/DarkModeSwitcher';
@@ -12,6 +12,16 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (error) {
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = setTimeout(() => setError(null), 2000);
+    }
+    return () => { if (errorTimerRef.current) clearTimeout(errorTimerRef.current); };
+  }, [error]);
 
   if (loading) {
     return (
@@ -35,125 +45,156 @@ const Login: React.FC = () => {
       const from = (location.state as { from?: string })?.from ?? '/';
       navigate(from, { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Connexion impossible');
+      setError(err instanceof Error ? err.message : 'Connexion impossible. Veuillez réessayer.');
     } finally {
       setSubmitting(false);
     }
   };
 
+  const clearError = () => { if (error) setError(null); };
+
+  const inputClass = (hasError: boolean) =>
+    `w-full rounded-lg border bg-gray dark:bg-form-input py-3 pl-4 pr-12 text-sm text-black dark:text-white placeholder-bodydark2 outline-none transition focus:border-primary dark:focus:border-primary ${
+      hasError
+        ? 'border-danger dark:border-danger'
+        : 'border-stroke dark:border-form-strokedark'
+    }`;
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8 bg-gray-2 dark:bg-boxdark-2">
-      {/* Thème + Logo */}
+      {/* Bouton thème */}
       <div className="absolute top-4 right-4">
         <DarkModeSwitcher />
       </div>
-      <Link
-        to="/"
-        className="mb-8 flex items-center justify-center gap-3"
-        aria-label="Retour à l'accueil"
-      >
-        <img src={LogoIcon} alt="Logo" className="h-12 w-12" />
-        <span className="text-xl font-semibold" style={{ color: '#3c50e0' }}>
-          OpsDigital
-        </span>
-      </Link>
 
       {/* Card */}
-      <div className="w-full max-w-md rounded-lg border border-stroke dark:border-strokedark bg-white dark:bg-boxdark shadow-default">
-        <form onSubmit={handleSubmit} className="p-6 sm:p-8">
-          <div className="mb-5">
+      <div className="w-full max-w-md rounded-xl border border-stroke dark:border-strokedark bg-white dark:bg-boxdark shadow-default">
+
+        {/* En-tête de la card */}
+        <div className="flex flex-col items-center px-8 pt-8 pb-6 border-b border-stroke dark:border-strokedark">
+          <Link to="/" aria-label="Accueil OpsDigital" className="mb-4">
+            <img src={LogoIcon} alt="OpsDigital" className="h-12 w-12" />
+          </Link>
+          <h1 className="text-2xl font-bold text-black dark:text-white">Connexion</h1>
+          <p className="mt-1.5 text-sm text-bodydark2">Accédez à votre espace OpsDigital</p>
+        </div>
+
+        {/* Formulaire */}
+        <form onSubmit={handleSubmit} className="px-8 py-7" noValidate>
+
+          {/* Message d'erreur global */}
+          {error && (
+            <div
+              role="alert"
+              className="mb-5 flex items-start gap-3 rounded-lg border border-danger/30 bg-danger/10 px-4 py-3"
+            >
+              <svg
+                className="mt-0.5 shrink-0 text-danger"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="12" cy="16" r="1" fill="currentColor" />
+              </svg>
+              <p className="text-sm leading-snug text-danger">{error}</p>
+            </div>
+          )}
+
+          {/* Champ e-mail */}
+          <div className="mb-4">
             <label
               htmlFor="email"
-              className="mb-2.5 block text-sm font-medium text-black dark:text-white"
+              className="mb-2 block text-sm font-medium text-black dark:text-white"
             >
-              E-mail
+              Adresse e-mail
             </label>
             <div className="relative">
               <input
                 id="email"
                 type="email"
+                autoComplete="email"
                 placeholder="votre@email.com"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-stroke dark:border-form-strokedark bg-gray dark:bg-form-input py-3 pl-4 pr-12 text-black dark:text-white placeholder-bodydark2 outline-none transition focus:border-primary"
+                onChange={(e) => { setEmail(e.target.value); clearError(); }}
+                className={inputClass(!!error)}
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-bodydark2">
-                <svg
-                  className="fill-current"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 22 22"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
+              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-bodydark2">
+                <svg className="fill-current" width="18" height="18" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <g opacity="0.5">
-                    <path
-                      d="M19.2516 3.30005H2.75156C1.58281 3.30005 0.585938 4.26255 0.585938 5.46567V16.6032C0.585938 17.7719 1.54844 18.7688 2.75156 18.7688H19.2516C20.4203 18.7688 21.4172 17.8063 21.4172 16.6032V5.4313C21.4172 4.26255 20.4203 3.30005 19.2516 3.30005ZM19.2516 4.84692C19.2859 4.84692 19.3203 4.84692 19.3547 4.84692L11.0016 10.2094L2.64844 4.84692C2.68281 4.84692 2.71719 4.84692 2.75156 4.84692H19.2516ZM19.2516 17.1532H2.75156C2.40781 17.1532 2.13281 16.8782 2.13281 16.5344V6.35942L10.1766 11.5157C10.4172 11.6875 10.6922 11.7563 10.9672 11.7563C11.2422 11.7563 11.5172 11.6875 11.7578 11.5157L19.8016 6.35942V16.5688C19.8703 16.9125 19.5953 17.1532 19.2516 17.1532Z"
-                      fill=""
-                    />
+                    <path d="M19.2516 3.30005H2.75156C1.58281 3.30005 0.585938 4.26255 0.585938 5.46567V16.6032C0.585938 17.7719 1.54844 18.7688 2.75156 18.7688H19.2516C20.4203 18.7688 21.4172 17.8063 21.4172 16.6032V5.4313C21.4172 4.26255 20.4203 3.30005 19.2516 3.30005ZM19.2516 4.84692C19.2859 4.84692 19.3203 4.84692 19.3547 4.84692L11.0016 10.2094L2.64844 4.84692C2.68281 4.84692 2.71719 4.84692 2.75156 4.84692H19.2516ZM19.2516 17.1532H2.75156C2.40781 17.1532 2.13281 16.8782 2.13281 16.5344V6.35942L10.1766 11.5157C10.4172 11.6875 10.6922 11.7563 10.9672 11.7563C11.2422 11.7563 11.5172 11.6875 11.7578 11.5157L19.8016 6.35942V16.5688C19.8703 16.9125 19.5953 17.1532 19.2516 17.1532Z" fill="" />
                   </g>
                 </svg>
               </span>
             </div>
           </div>
 
-          {error && (
-            <div className="mb-4 rounded-lg border border-danger/30 bg-danger/10 py-2.5 px-4 text-sm text-danger">
-              {error}
-            </div>
-          )}
-
-          <div className="mb-6">
+          {/* Champ mot de passe */}
+          <div className="mb-7">
             <label
               htmlFor="password"
-              className="mb-2.5 block text-sm font-medium text-black dark:text-white"
+              className="mb-2 block text-sm font-medium text-black dark:text-white"
             >
               Mot de passe
             </label>
             <div className="relative">
               <input
                 id="password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
                 placeholder="••••••••"
                 required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-stroke dark:border-form-strokedark bg-gray dark:bg-form-input py-3 pl-4 pr-12 text-black dark:text-white placeholder-bodydark2 outline-none transition focus:border-primary"
+                onChange={(e) => { setPassword(e.target.value); clearError(); }}
+                className={inputClass(!!error)}
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-bodydark2">
-                <svg
-                  className="fill-current"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 22 22"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <g opacity="0.5">
-                    <path
-                      d="M16.1547 6.80626V5.91251C16.1547 3.16251 14.0922 0.825009 11.4797 0.618759C10.0359 0.481259 8.59219 0.996884 7.52656 1.95938C6.46094 2.92188 5.84219 4.29688 5.84219 5.70626V6.80626C3.84844 7.18438 2.33594 8.93751 2.33594 11.0688V17.2906C2.33594 19.5594 4.19219 21.3813 6.42656 21.3813H15.5016C17.7703 21.3813 19.6266 19.525 19.6266 17.2563V11C19.6609 8.93751 18.1484 7.21876 16.1547 6.80626ZM8.55781 3.09376C9.31406 2.40626 10.3109 2.06251 11.3422 2.16563C13.1641 2.33751 14.6078 3.98751 14.6078 5.91251V6.70313H7.38906V5.67188C7.38906 4.70938 7.80156 3.78126 8.55781 3.09376ZM18.1141 17.2906C18.1141 18.7 16.9453 19.8688 15.5359 19.8688H6.46094C5.05156 19.8688 3.91719 18.7344 3.91719 17.325V11.0688C3.91719 9.52189 5.15469 8.28438 6.70156 8.28438H15.2953C16.8422 8.28438 18.1141 9.52188 18.1141 11V17.2906Z"
-                      fill=""
-                    />
-                    <path
-                      d="M10.9977 11.8594C10.5852 11.8594 10.207 12.2031 10.207 12.65V16.2594C10.207 16.6719 10.5508 17.05 10.9977 17.05C11.4102 17.05 11.7883 16.7063 11.7883 16.2594V12.6156C11.7883 12.2031 11.4102 11.8594 10.9977 11.8594Z"
-                      fill=""
-                    />
-                  </g>
-                </svg>
-              </span>
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-bodydark2 hover:text-black dark:hover:text-white focus:outline-none"
+                aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+              >
+                {showPassword ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                )}
+              </button>
             </div>
           </div>
 
+          {/* Bouton de soumission */}
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-lg border border-primary bg-primary py-3.5 font-medium text-white transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white disabled:opacity-70 dark:focus:ring-offset-boxdark"
+            className="w-full rounded-lg border border-primary bg-primary py-3.5 text-sm font-medium text-white transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white disabled:opacity-70 dark:focus:ring-offset-boxdark"
           >
-            {submitting ? 'Connexion…' : 'Se connecter'}
+            {submitting ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                Connexion en cours…
+              </span>
+            ) : (
+              'Se connecter'
+            )}
           </button>
         </form>
       </div>
+
+      {/* Pied de page */}
+      <p className="mt-6 text-xs text-bodydark2">
+        © {new Date().getFullYear()} OpsDigital — Accès réservé au personnel autorisé
+      </p>
     </div>
   );
 };

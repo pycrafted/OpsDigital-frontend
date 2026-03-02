@@ -8,6 +8,8 @@ import {
   productionHourLabels,
 } from '../../data/production';
 import { DURATION_LABELS, type DurationFilter } from './ChartAnalysesLaboratoire';
+import useColorMode from '../../hooks/useColorMode';
+import { useProductionBounds } from '../../context/ProductionBoundsContext';
 
 const WEEK_DAY_LABELS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'] as const;
 const MONTH_NAMES = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'] as const;
@@ -106,6 +108,9 @@ export interface ChartProductionProps {
   selectedIndicateur: string;
   onIndicateurChange: (key: string) => void;
   embedded?: boolean;
+  leftSlot?: React.ReactNode;
+  centerSlot?: React.ReactNode;
+  rightSlot?: React.ReactNode;
   weekProductionData?: WeekProductionData;
   monthProductionData?: MonthProductionData;
   quarterProductionData?: QuarterProductionData;
@@ -256,14 +261,20 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
   selectedIndicateur,
   onIndicateurChange,
   embedded = false,
+  leftSlot,
+  centerSlot,
+  rightSlot,
   weekProductionData,
   monthProductionData,
   quarterProductionData,
   semesterProductionData,
   yearProductionData,
 }) => {
+  const { isOutOfBounds } = useProductionBounds();
+  const [colorMode] = useColorMode();
   const isDay = duration === 'day';
   const isWeek = duration === 'week';
+  const isMonth = duration === 'month';
 
   const xTitle =
     duration === 'day'
@@ -287,16 +298,22 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
       if (weekProductionData && weekProductionData.dates.length > 0) {
         const categories: string[] = [];
         const chartValues: number[] = [];
+        const outOfBoundsIndices: number[] = [];
+        const conformeIndices: number[] = [];
         weekProductionData.dates.forEach((date, dayIndex) => {
           const dayRows = weekProductionData.rowsByDate[date] ?? [];
           PRODUCTION_HOURS.forEach((h) => {
             categories.push(`${WEEK_DAY_LABELS[dayIndex]} ${productionHourLabels[h]}`);
             const row = dayRows.find((r) => r.hour === h);
-            const v = row ? parseValue(row.values[selectedIndicateur] ?? '') : 0;
+            const rawValue = row?.values[selectedIndicateur] ?? '';
+            const v = rawValue ? parseValue(rawValue) : 0;
             chartValues.push(v);
+            const oob = rawValue !== '' && isOutOfBounds(selectedIndicateur, rawValue);
+            if (rawValue !== '' && oob) outOfBoundsIndices.push(categories.length - 1);
+            else if (rawValue !== '') conformeIndices.push(categories.length - 1);
           });
         });
-        return { categories, series: [{ name: indicateurLabel, data: chartValues }] };
+        return { categories, series: [{ name: indicateurLabel, data: chartValues }], outOfBoundsIndices, conformeIndices };
       }
       return getEmptyWeekData(indicateurLabel);
     }
@@ -304,6 +321,8 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
       if (monthProductionData && monthProductionData.dates.length > 0) {
         const categories: string[] = [];
         const chartValues: number[] = [];
+        const outOfBoundsIndices: number[] = [];
+        const conformeIndices: number[] = [];
         monthProductionData.dates.forEach((date) => {
           const dayRows = monthProductionData.rowsByDate[date] ?? [];
           const [y, m, d] = date.split('-').map(Number);
@@ -311,11 +330,15 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
           PRODUCTION_HOURS.forEach((h) => {
             categories.push(`${dateLabel} ${productionHourLabels[h]}`);
             const row = dayRows.find((r) => r.hour === h);
-            const v = row ? parseValue(row.values[selectedIndicateur] ?? '') : 0;
+            const rawValue = row?.values[selectedIndicateur] ?? '';
+            const v = rawValue ? parseValue(rawValue) : 0;
             chartValues.push(v);
+            const oob = rawValue !== '' && isOutOfBounds(selectedIndicateur, rawValue);
+            if (rawValue !== '' && oob) outOfBoundsIndices.push(categories.length - 1);
+            else if (rawValue !== '') conformeIndices.push(categories.length - 1);
           });
         });
-        return { categories, series: [{ name: indicateurLabel, data: chartValues }] };
+        return { categories, series: [{ name: indicateurLabel, data: chartValues }], outOfBoundsIndices, conformeIndices };
       }
       return getEmptyMonthData(selectedMonthProp, indicateurLabel);
     }
@@ -387,7 +410,7 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
       categories,
       series: [{ name: indicateurLabel, data: values }],
     };
-  }, [data, duration, selectedIndicateur, indicateurLabel, selectedMonthProp, selectedQuarterProp, selectedSemesterProp, selectedYearProp, weekProductionData, monthProductionData, quarterProductionData, semesterProductionData, yearProductionData]);
+  }, [data, duration, selectedIndicateur, indicateurLabel, selectedMonthProp, selectedQuarterProp, selectedSemesterProp, selectedYearProp, weekProductionData, monthProductionData, quarterProductionData, semesterProductionData, yearProductionData, isOutOfBounds]);
 
   const isDarkMode =
     typeof document !== 'undefined' &&
@@ -424,14 +447,7 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
           categories: chartData.categories,
           title: { text: xTitle, style: { fontSize: '12px' } },
         },
-        legend: {
-          position: 'top',
-          horizontalAlign: 'left',
-          fontFamily: 'Satoshi',
-          fontWeight: 500,
-          fontSize: '14px',
-          markers: { radius: 99 },
-        },
+        legend: { show: false },
         fill: { opacity: 1 },
         yaxis: {
           title: { text: indicateurLabel || 'Valeur', style: { fontSize: '12px' } },
@@ -442,8 +458,35 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
     }
 
     if (isWeek) {
-      // Courbe SEMAINE : couleur adaptée au mode sombre
+      // Courbe SEMAINE : valeurs hors bornes = ligne verticale rouge + point rouge (même taille que /graphique)
+      const conformeBlue = '#3c50e0';
       const weekColor = isDarkMode ? '#4ade80' : '#044c4b';
+      const oobRed = '#DC2626';
+      const weekChartData = chartData as {
+        categories: string[];
+        series: { name: string; data: number[] }[];
+        outOfBoundsIndices?: number[];
+        conformeIndices?: number[];
+      };
+      const outOfBoundsIndices = weekChartData.outOfBoundsIndices ?? [];
+      const conformeIndices = weekChartData.conformeIndices ?? [];
+      const categoriesWeek = weekChartData.categories ?? [];
+      const discreteMarkersConform = conformeIndices.map((dataPointIndex) => ({
+        seriesIndex: 0,
+        dataPointIndex,
+        fillColor: conformeBlue,
+        strokeColor: '#fff',
+        size: 5,
+        strokeWidth: 1,
+      }));
+      const discreteMarkersOob = outOfBoundsIndices.map((dataPointIndex) => ({
+        seriesIndex: 0,
+        dataPointIndex,
+        fillColor: oobRed,
+        strokeColor: '#fff',
+        size: 5,
+        strokeWidth: 1,
+      }));
       return {
         legend: { show: false },
         colors: [weekColor],
@@ -455,6 +498,18 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
           dropShadow: { enabled: true, color: '#623CEA14', top: 10, blur: 4, left: 0, opacity: 0.1 },
           toolbar: { show: false },
         },
+        annotations: outOfBoundsIndices.length > 0
+          ? {
+              xaxis: outOfBoundsIndices.map((dataPointIndex) => ({
+                x: categoriesWeek[dataPointIndex],
+                borderColor: oobRed,
+                strokeWidth: 2,
+                opacity: 1,
+                strokeDashArray: 0,
+                label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
+              })),
+            }
+          : undefined,
         stroke: { width: 2, curve: 'straight' },
         fill: {
           type: 'gradient',
@@ -475,7 +530,7 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
           strokeWidth: 2,
           strokeOpacity: 0.9,
           fillOpacity: 1,
-          discrete: [],
+          discrete: [...discreteMarkersConform, ...discreteMarkersOob],
           hover: { size: undefined, sizeOffset: 3 },
         },
         xaxis: {
@@ -501,6 +556,116 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
           title: { text: indicateurLabel || 'Valeur', style: { fontSize: '12px' } },
           min: 0,
           max: undefined,
+          labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
+        },
+        tooltip: {
+          x: {
+            formatter: (_val: string, opts?: { dataPointIndex?: number }) =>
+              chartData.categories[opts?.dataPointIndex ?? 0] ?? '',
+          },
+          y: { formatter: (val: number) => formatYAxisLabel(val) },
+        },
+      };
+    }
+
+    if (duration === 'month') {
+      // Courbe MOIS : valeurs hors bornes = ligne verticale rouge + point rouge (taille 3, comme /graphique)
+      const conformeBlue = '#3c50e0';
+      const oobRed = '#DC2626';
+      const monthColor = isDarkMode ? '#E5E7EB' : '#000000';
+      const monthChartData = chartData as {
+        categories: string[];
+        series: { name: string; data: number[] }[];
+        outOfBoundsIndices?: number[];
+        conformeIndices?: number[];
+      };
+      const outOfBoundsIndices = monthChartData.outOfBoundsIndices ?? [];
+      const conformeIndices = monthChartData.conformeIndices ?? [];
+      const categoriesMonth = monthChartData.categories ?? [];
+      const discreteMarkersConform = conformeIndices.map((dataPointIndex) => ({
+        seriesIndex: 0,
+        dataPointIndex,
+        fillColor: conformeBlue,
+        strokeColor: '#fff',
+        size: 3,
+        strokeWidth: 1,
+      }));
+      const discreteMarkersOob = outOfBoundsIndices.map((dataPointIndex) => ({
+        seriesIndex: 0,
+        dataPointIndex,
+        fillColor: oobRed,
+        strokeColor: '#fff',
+        size: 3,
+        strokeWidth: 1,
+      }));
+      return {
+        legend: { show: false },
+        colors: [monthColor],
+        chart: {
+          fontFamily: 'Satoshi, sans-serif',
+          height: 335,
+          type: 'area',
+          background: 'transparent',
+          dropShadow: { enabled: true, color: '#623CEA14', top: 10, blur: 4, left: 0, opacity: 0.1 },
+          toolbar: { show: false },
+        },
+        annotations: outOfBoundsIndices.length > 0
+          ? {
+              xaxis: outOfBoundsIndices.map((dataPointIndex) => ({
+                x: categoriesMonth[dataPointIndex],
+                borderColor: oobRed,
+                strokeWidth: 2,
+                opacity: 1,
+                strokeDashArray: 0,
+                label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
+              })),
+            }
+          : undefined,
+        stroke: { width: 2, curve: 'straight' },
+        fill: {
+          type: 'gradient',
+          gradient: {
+            shade: 'dark',
+            type: 'vertical',
+            shadeIntensity: 0.5,
+            opacityFrom: 0.55,
+            opacityTo: 0.05,
+          },
+        },
+        grid: { xaxis: { lines: { show: false } }, yaxis: { lines: { show: true } } },
+        dataLabels: { enabled: false },
+        markers: {
+          size: 1,
+          colors: '#fff',
+          strokeColors: [monthColor],
+          strokeWidth: 1,
+          strokeOpacity: 0.9,
+          fillOpacity: 1,
+          discrete: [...discreteMarkersConform, ...discreteMarkersOob],
+          hover: { size: 3, sizeOffset: 2 },
+        },
+        xaxis: {
+          type: 'category',
+          categories: chartData.categories,
+          title: { text: xTitle, style: { fontSize: '12px' } },
+          labels: {
+            show: false,
+            style: { fontSize: '9px' },
+            rotate: 0,
+            formatter: (val: string, _timestamp?: unknown, opts?: { i?: number }) => {
+              const datePart = String(val).split(' ')[0] ?? '';
+              const day = datePart.split('/')[0] ?? '';
+              const idx = opts?.i ?? 0;
+              if (idx === 0) return day;
+              const prevDate = String(chartData.categories[idx - 1]).split(' ')[0] ?? '';
+              return datePart !== prevDate ? day : '';
+            },
+          },
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+        },
+        yaxis: {
+          title: { text: indicateurLabel || 'Valeur', style: { fontSize: '12px' } },
           labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
         },
         tooltip: {
@@ -600,10 +765,17 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
         y: { formatter: (val: number) => formatYAxisLabel(val) },
       },
     };
-  }, [chartData.categories, duration, isDay, isWeek, xTitle, indicateurLabel, isDarkMode]);
+  }, [chartData, duration, isDay, isWeek, xTitle, indicateurLabel, isDarkMode]);
 
   return (
     <div className={embedded ? 'flex min-h-0 w-full flex-1 flex-col items-start' : ''}>
+      {(leftSlot || centerSlot || rightSlot) && (
+        <div className="mb-3 flex items-center gap-2">
+          <div className="flex-1">{leftSlot}</div>
+          <div className="flex justify-center gap-2">{centerSlot}</div>
+          <div className="flex flex-1 flex-wrap justify-end gap-2">{rightSlot}</div>
+        </div>
+      )}
       <div className="w-full min-h-[300px]">
         {chartData.series.length > 0 && chartData.categories.length > 0 ? (
           <ReactApexChart
@@ -620,6 +792,31 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
           </div>
         )}
       </div>
+      {isDay && (
+        <div className="mt-3 flex flex-wrap justify-end gap-2">
+          {Object.entries(HOUR_COLORS).map(([hkey, color]) => {
+            const label = hkey.replace(/^h(\d+)$/, '$1h');
+            return (
+              <div key={hkey} className="flex items-center gap-2 rounded border bg-white px-3 py-1 shadow-sm dark:bg-transparent" style={{ borderColor: color, ...(colorMode === 'dark' ? { backgroundColor: `${color}33` } : {}) }}>
+                <span className="h-2.5 w-2.5 rounded-full shadow-sm" style={{ backgroundColor: color }} />
+                <span className="text-xs font-semibold tracking-wide" style={{ color }}>{label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {(isWeek || isMonth) && (
+        <div className="mt-3 flex flex-wrap justify-end gap-2">
+          <div className="flex items-center gap-2 rounded border border-[#3c50e0] bg-white px-3 py-1 shadow-sm dark:bg-[#3c50e0]/20">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#3c50e0] shadow-sm" />
+            <span className="text-xs font-semibold tracking-wide text-[#3c50e0]">Conforme</span>
+          </div>
+          <div className="flex items-center gap-2 rounded border border-[#DC2626] bg-white px-3 py-1 shadow-sm dark:bg-[#DC2626]/20">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#DC2626] shadow-sm" />
+            <span className="text-xs font-semibold tracking-wide text-[#DC2626]">Non conforme</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

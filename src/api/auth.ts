@@ -52,6 +52,9 @@ export async function login(
   });
   const data = (await res.json().catch(() => ({}))) as unknown;
   if (!res.ok) {
+    if (res.status === 401 || res.status === 400) {
+      throw new Error('E-mail ou mot de passe incorrect.');
+    }
     throw new Error(readError(res, data));
   }
   const out = data as LoginResponse;

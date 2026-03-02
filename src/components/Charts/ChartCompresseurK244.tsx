@@ -7,7 +7,9 @@ import {
   COMPRESSEUR_K244_HOURS,
   compresseurK244HourLabels,
 } from '../../data/compresseurK244';
+import { useCompresseurK244Bounds } from '../../context/CompresseurK244BoundsContext';
 import { type DurationFilter } from './ChartAnalysesLaboratoire';
+import useColorMode from '../../hooks/useColorMode';
 
 const WEEK_DAY_LABELS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'] as const;
 const MONTH_NAMES = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'] as const;
@@ -109,6 +111,9 @@ export interface ChartCompresseurK244Props {
   selectedIndicateur: string;
   onIndicateurChange: (key: string) => void;
   embedded?: boolean;
+  leftSlot?: React.ReactNode;
+  centerSlot?: React.ReactNode;
+  rightSlot?: React.ReactNode;
   /** Données backend pour la vue Hebdomadaire (quand fourni, remplace les données vides). */
   weekCompresseurK244Data?: WeekCompresseurK244Data;
   /** Données backend pour la vue Mois (quand fourni, remplace les données vides). */
@@ -272,14 +277,20 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
   selectedIndicateur,
   onIndicateurChange,
   embedded = false,
+  leftSlot,
+  centerSlot,
+  rightSlot,
   weekCompresseurK244Data,
   monthCompresseurK244Data,
   quarterCompresseurK244Data,
   semesterCompresseurK244Data,
   yearCompresseurK244Data,
 }) => {
+  const { isOutOfBounds } = useCompresseurK244Bounds();
+  const [colorMode] = useColorMode();
   const isDay = duration === 'day';
   const isWeek = duration === 'week';
+  const isMonth = duration === 'month';
 
   const xTitle =
     duration === 'day'
@@ -313,18 +324,26 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
       if (weekCompresseurK244Data && weekCompresseurK244Data.dates.length > 0) {
         const categories: string[] = [];
         const chartValues: number[] = [];
+        const outOfBoundsIndices: number[] = [];
+        const conformeIndices: number[] = [];
         weekCompresseurK244Data.dates.forEach((date, dayIndex) => {
           const dayRows = weekCompresseurK244Data.rowsByDate[date] ?? [];
           COMPRESSEUR_K244_HOURS.forEach((h) => {
             categories.push(`${WEEK_DAY_LABELS[dayIndex]} ${compresseurK244HourLabels[h]}`);
             const row = dayRows.find((r) => r.hour === h);
-            const v = row ? parseValue(row.values[selectedIndicateur] ?? '') : 0;
+            const rawValue = row?.values[selectedIndicateur] ?? '';
+            const v = rawValue ? parseValue(rawValue) : 0;
             chartValues.push(v);
+            const oob = rawValue !== '' && isOutOfBounds(selectedIndicateur, rawValue);
+            if (rawValue !== '' && oob) outOfBoundsIndices.push(categories.length - 1);
+            else if (rawValue !== '') conformeIndices.push(categories.length - 1);
           });
         });
         return {
           categories,
           series: [{ name: indicateurLabel, data: chartValues }],
+          outOfBoundsIndices,
+          conformeIndices,
         };
       }
       return getEmptyWeekData();
@@ -333,6 +352,8 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
       if (monthCompresseurK244Data && monthCompresseurK244Data.dates.length > 0) {
         const categories: string[] = [];
         const chartValues: number[] = [];
+        const outOfBoundsIndices: number[] = [];
+        const conformeIndices: number[] = [];
         monthCompresseurK244Data.dates.forEach((date) => {
           const dayRows = monthCompresseurK244Data.rowsByDate[date] ?? [];
           const parts = date.split('-').map(Number);
@@ -346,8 +367,12 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
           COMPRESSEUR_K244_HOURS.forEach((h) => {
             categories.push(`${dateLabel} ${compresseurK244HourLabels[h]}`);
             const row = dayRows.find((r) => r.hour === h);
-            const v = row ? parseValue(row.values[selectedIndicateur] ?? '') : 0;
+            const rawValue = row?.values[selectedIndicateur] ?? '';
+            const v = rawValue ? parseValue(rawValue) : 0;
             chartValues.push(v);
+            const oob = rawValue !== '' && isOutOfBounds(selectedIndicateur, rawValue);
+            if (rawValue !== '' && oob) outOfBoundsIndices.push(categories.length - 1);
+            else if (rawValue !== '') conformeIndices.push(categories.length - 1);
           });
         });
         console.log('[K244 Mois] chartData mois (données backend):', {
@@ -358,6 +383,8 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
         return {
           categories,
           series: [{ name: indicateurLabel, data: chartValues }],
+          outOfBoundsIndices,
+          conformeIndices,
         };
       }
       console.log('[K244 Mois] chartData mois: pas de données backend, utilisation getEmptyMonthData');
@@ -367,6 +394,7 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
       if (quarterCompresseurK244Data && quarterCompresseurK244Data.dates.length > 0) {
         const categories: string[] = [];
         const chartValues: number[] = [];
+        const outOfBoundsIndices: number[] = [];
         quarterCompresseurK244Data.dates.forEach((date) => {
           const dayRows = quarterCompresseurK244Data.rowsByDate[date] ?? [];
           const parts = date.split('-').map(Number);
@@ -380,13 +408,17 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
           COMPRESSEUR_K244_HOURS.forEach((h) => {
             categories.push(`${dateLabel} ${compresseurK244HourLabels[h]}`);
             const row = dayRows.find((r) => r.hour === h);
-            const v = row ? parseValue(row.values[selectedIndicateur] ?? '') : 0;
+            const rawValue = row?.values[selectedIndicateur] ?? '';
+            const v = rawValue ? parseValue(rawValue) : 0;
             chartValues.push(v);
+            const oob = rawValue !== '' && isOutOfBounds(selectedIndicateur, rawValue);
+            if (rawValue !== '' && oob) outOfBoundsIndices.push(categories.length - 1);
           });
         });
         return {
           categories,
           series: [{ name: indicateurLabel, data: chartValues }],
+          outOfBoundsIndices,
         };
       }
       return getEmptyQuarterData(selectedQuarterProp);
@@ -458,7 +490,7 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
       categories,
       series: [{ name: indicateurLabel, data: values }],
     };
-  }, [data, duration, selectedIndicateur, indicateurLabel, selectedMonthProp, selectedQuarterProp, selectedSemesterProp, selectedYearProp, weekCompresseurK244Data, monthCompresseurK244Data, quarterCompresseurK244Data, semesterCompresseurK244Data, yearCompresseurK244Data]);
+  }, [data, duration, selectedIndicateur, indicateurLabel, selectedMonthProp, selectedQuarterProp, selectedSemesterProp, selectedYearProp, weekCompresseurK244Data, monthCompresseurK244Data, quarterCompresseurK244Data, semesterCompresseurK244Data, yearCompresseurK244Data, isOutOfBounds]);
 
   const isDarkMode =
     typeof document !== 'undefined' &&
@@ -477,6 +509,7 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
           stacked: true,
           toolbar: { show: false },
           zoom: { enabled: false },
+          animations: { dynamicAnimation: { enabled: false } },
         },
         stroke: { width: 2, colors: hourColorsArr },
         plotOptions: {
@@ -496,14 +529,7 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
           title: { text: xTitle, style: { fontSize: '12px' } },
           crosshairs: { show: true, position: 'back' as const, stroke: { width: 1, color: '#b1b9c4' } },
         },
-        legend: {
-          position: 'top',
-          horizontalAlign: 'left',
-          fontFamily: 'Satoshi',
-          fontWeight: 500,
-          fontSize: '14px',
-          markers: { radius: 99 },
-        },
+        legend: { show: false },
         fill: { opacity: 1 },
         yaxis: {
           title: { text: indicateurLabel || 'Valeur', style: { fontSize: '12px' } },
@@ -514,8 +540,35 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
     }
 
     if (isWeek) {
-      // Courbe SEMAINE : couleur adaptée au mode sombre
+      // Courbe SEMAINE : valeurs hors bornes = ligne verticale rouge + point rouge (même taille que /graphique)
       const weekColor = isDarkMode ? '#4ade80' : '#044c4b';
+      const oobRed = '#DC2626';
+      const conformeBlue = '#3c50e0';
+      const weekChartData = chartData as {
+        categories: string[];
+        series: { name: string; data: number[] }[];
+        outOfBoundsIndices?: number[];
+        conformeIndices?: number[];
+      };
+      const outOfBoundsIndices = weekChartData.outOfBoundsIndices ?? [];
+      const conformeIndices = weekChartData.conformeIndices ?? [];
+      const categoriesWeek = weekChartData.categories ?? [];
+      const discreteMarkersConform = conformeIndices.map((dataPointIndex) => ({
+        seriesIndex: 0,
+        dataPointIndex,
+        fillColor: conformeBlue,
+        strokeColor: '#fff',
+        size: 5,
+        strokeWidth: 1,
+      }));
+      const discreteMarkersOob = outOfBoundsIndices.map((dataPointIndex) => ({
+        seriesIndex: 0,
+        dataPointIndex,
+        fillColor: oobRed,
+        strokeColor: '#fff',
+        size: 5,
+        strokeWidth: 1,
+      }));
       return {
         legend: { show: false },
         colors: [weekColor],
@@ -526,7 +579,20 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
           background: 'transparent',
           dropShadow: { enabled: true, color: '#623CEA14', top: 10, blur: 4, left: 0, opacity: 0.1 },
           toolbar: { show: false },
+          animations: { dynamicAnimation: { enabled: false } },
         },
+        annotations: outOfBoundsIndices.length > 0
+          ? {
+              xaxis: outOfBoundsIndices.map((dataPointIndex) => ({
+                x: categoriesWeek[dataPointIndex],
+                borderColor: oobRed,
+                strokeWidth: 2,
+                opacity: 1,
+                strokeDashArray: 0,
+                label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
+              })),
+            }
+          : undefined,
         stroke: { width: 2, curve: 'straight' },
         fill: {
           type: 'gradient',
@@ -547,7 +613,7 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
           strokeWidth: 2,
           strokeOpacity: 0.9,
           fillOpacity: 1,
-          discrete: [],
+          discrete: [...discreteMarkersConform, ...discreteMarkersOob],
           hover: { size: undefined, sizeOffset: 3 },
         },
         xaxis: {
@@ -574,6 +640,219 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
           title: { text: indicateurLabel || 'Valeur', style: { fontSize: '12px' } },
           min: 0,
           max: undefined,
+          labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
+        },
+        tooltip: {
+          x: {
+            formatter: (_val: string, opts?: { dataPointIndex?: number }) =>
+              chartData.categories[opts?.dataPointIndex ?? 0] ?? '',
+          },
+          y: { formatter: (val: number) => formatYAxisLabel(val) },
+        },
+      };
+    }
+
+    if (duration === 'month') {
+      // Courbe MOIS : valeurs hors bornes = ligne verticale rouge + point rouge (taille 3, comme /graphique)
+      const oobRed = '#DC2626';
+      const conformeBlue = '#3c50e0';
+      const monthColor = isDarkMode ? '#E5E7EB' : '#000000';
+      const monthChartData = chartData as {
+        categories: string[];
+        series: { name: string; data: number[] }[];
+        outOfBoundsIndices?: number[];
+        conformeIndices?: number[];
+      };
+      const outOfBoundsIndices = monthChartData.outOfBoundsIndices ?? [];
+      const conformeIndices = monthChartData.conformeIndices ?? [];
+      const categoriesMonth = monthChartData.categories ?? [];
+      const discreteMarkersConform = conformeIndices.map((dataPointIndex) => ({
+        seriesIndex: 0,
+        dataPointIndex,
+        fillColor: conformeBlue,
+        strokeColor: '#fff',
+        size: 3,
+        strokeWidth: 1,
+      }));
+      const discreteMarkersOob = outOfBoundsIndices.map((dataPointIndex) => ({
+        seriesIndex: 0,
+        dataPointIndex,
+        fillColor: oobRed,
+        strokeColor: '#fff',
+        size: 3,
+        strokeWidth: 1,
+      }));
+      return {
+        legend: { show: false },
+        colors: [monthColor],
+        chart: {
+          fontFamily: 'Satoshi, sans-serif',
+          height: 335,
+          type: 'area',
+          background: 'transparent',
+          dropShadow: { enabled: true, color: '#623CEA14', top: 10, blur: 4, left: 0, opacity: 0.1 },
+          toolbar: { show: false },
+          animations: { dynamicAnimation: { enabled: false } },
+        },
+        annotations: outOfBoundsIndices.length > 0
+          ? {
+              xaxis: outOfBoundsIndices.map((dataPointIndex) => ({
+                x: categoriesMonth[dataPointIndex],
+                borderColor: oobRed,
+                strokeWidth: 2,
+                opacity: 1,
+                strokeDashArray: 0,
+                label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
+              })),
+            }
+          : undefined,
+        stroke: { width: 2, curve: 'straight' },
+        fill: {
+          type: 'gradient',
+          gradient: {
+            shade: 'dark',
+            type: 'vertical',
+            shadeIntensity: 0.5,
+            opacityFrom: 0.55,
+            opacityTo: 0.05,
+          },
+        },
+        grid: { xaxis: { lines: { show: false } }, yaxis: { lines: { show: true } } },
+        dataLabels: { enabled: false },
+        markers: {
+          size: 1,
+          colors: '#fff',
+          strokeColors: [monthColor],
+          strokeWidth: 1,
+          strokeOpacity: 0.9,
+          fillOpacity: 1,
+          discrete: [...discreteMarkersConform, ...discreteMarkersOob],
+          hover: { size: 3, sizeOffset: 2 },
+        },
+        xaxis: {
+          type: 'category',
+          categories: chartData.categories,
+          title: { text: xTitle, style: { fontSize: '12px' } },
+          labels: {
+            show: false,
+            style: { fontSize: '9px' },
+            rotate: 0,
+            formatter: (val: string, _timestamp?: unknown, opts?: { i?: number }) => {
+              const datePart = String(val).split(' ')[0] ?? '';
+              const day = datePart.split('/')[0] ?? '';
+              const idx = opts?.i ?? 0;
+              if (idx === 0) return day;
+              const prevDate = String(chartData.categories[idx - 1]).split(' ')[0] ?? '';
+              return datePart !== prevDate ? day : '';
+            },
+          },
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          crosshairs: { show: true, position: 'back' as const, stroke: { width: 1, color: '#b1b9c4' } },
+        },
+        yaxis: {
+          title: { text: indicateurLabel || 'Valeur', style: { fontSize: '12px' } },
+          labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
+        },
+        tooltip: {
+          x: {
+            formatter: (_val: string, opts?: { dataPointIndex?: number }) =>
+              chartData.categories[opts?.dataPointIndex ?? 0] ?? '',
+          },
+          y: { formatter: (val: number) => formatYAxisLabel(val) },
+        },
+      };
+    }
+
+    if (duration === 'quarter') {
+      // Courbe TRIMESTRE : valeurs hors bornes = ligne verticale rouge + point rouge (taille 2, comme /graphique)
+      const oobRed = '#DC2626';
+      const quarterColor = '#7B9FD4';
+      const quarterChartData = chartData as {
+        categories: string[];
+        series: { name: string; data: number[] }[];
+        outOfBoundsIndices?: number[];
+      };
+      const outOfBoundsIndices = quarterChartData.outOfBoundsIndices ?? [];
+      const categoriesQuarter = quarterChartData.categories ?? [];
+      const discreteMarkersOob = outOfBoundsIndices.map((dataPointIndex) => ({
+        seriesIndex: 0,
+        dataPointIndex,
+        fillColor: oobRed,
+        strokeColor: '#fff',
+        size: 2,
+        strokeWidth: 1,
+      }));
+      return {
+        legend: { show: false },
+        colors: [quarterColor],
+        chart: {
+          fontFamily: 'Satoshi, sans-serif',
+          height: 335,
+          type: 'area',
+          background: 'transparent',
+          dropShadow: { enabled: true, color: '#623CEA14', top: 10, blur: 4, left: 0, opacity: 0.1 },
+          toolbar: { show: false },
+          animations: { dynamicAnimation: { enabled: false } },
+        },
+        annotations: outOfBoundsIndices.length > 0
+          ? {
+              xaxis: outOfBoundsIndices.map((dataPointIndex) => ({
+                x: categoriesQuarter[dataPointIndex],
+                borderColor: oobRed,
+                strokeWidth: 2,
+                opacity: 1,
+                strokeDashArray: 0,
+                label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
+              })),
+            }
+          : undefined,
+        stroke: { width: 2, curve: 'straight' },
+        fill: {
+          type: 'gradient',
+          gradient: {
+            shade: 'dark',
+            type: 'vertical',
+            shadeIntensity: 0.5,
+            opacityFrom: 0.55,
+            opacityTo: 0.05,
+          },
+        },
+        grid: { xaxis: { lines: { show: false } }, yaxis: { lines: { show: true } } },
+        dataLabels: { enabled: false },
+        markers: {
+          size: 1,
+          colors: '#fff',
+          strokeColors: [quarterColor],
+          strokeWidth: 1,
+          strokeOpacity: 0.9,
+          fillOpacity: 1,
+          discrete: discreteMarkersOob,
+          hover: { size: 3, sizeOffset: 2 },
+        },
+        xaxis: {
+          type: 'category',
+          categories: chartData.categories,
+          title: { text: xTitle, style: { fontSize: '12px' } },
+          labels: {
+            show: false,
+            style: { fontSize: '9px' },
+            rotate: 0,
+            formatter: (val: string, _timestamp?: unknown, opts?: { i?: number }) => {
+              const datePart = String(val).split(' ')[0] ?? '';
+              const day = datePart.split('/')[0] ?? '';
+              const idx = opts?.i ?? 0;
+              if (idx === 0) return day;
+              const prevDate = String(chartData.categories[idx - 1]).split(' ')[0] ?? '';
+              return datePart !== prevDate ? day : '';
+            },
+          },
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          crosshairs: { show: true, position: 'back' as const, stroke: { width: 1, color: '#b1b9c4' } },
+        },
+        yaxis: {
+          title: { text: indicateurLabel || 'Valeur', style: { fontSize: '12px' } },
           labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
         },
         tooltip: {
@@ -617,6 +896,7 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
         background: 'transparent',
         dropShadow: { enabled: true, color: '#623CEA14', top: 10, blur: 4, left: 0, opacity: 0.1 },
         toolbar: { show: false },
+        animations: { dynamicAnimation: { enabled: false } },
       },
       stroke: { width: 2, curve: 'straight' },
       fill: {
@@ -674,7 +954,7 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
         y: { formatter: (val: number) => formatYAxisLabel(val) },
       },
     };
-  }, [chartData.categories, duration, isDay, isWeek, xTitle, indicateurLabel, isDarkMode]);
+  }, [chartData, duration, isDay, isWeek, xTitle, indicateurLabel, isDarkMode]);
 
   useEffect(() => {
     if (duration !== 'month') return;
@@ -689,6 +969,13 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
 
   return (
     <div className={embedded ? 'flex min-h-0 w-full flex-1 flex-col items-start' : ''}>
+      {(leftSlot || centerSlot || rightSlot) && (
+        <div className="mb-3 flex items-center gap-2">
+          <div className="flex-1">{leftSlot}</div>
+          <div className="flex justify-center gap-2">{centerSlot}</div>
+          <div className="flex flex-1 flex-wrap justify-end gap-2">{rightSlot}</div>
+        </div>
+      )}
       <div className="w-full min-h-[300px]">
         {chartData.series.length > 0 && chartData.categories.length > 0 ? (
           <ReactApexChart
@@ -705,6 +992,31 @@ const ChartCompresseurK244: React.FC<ChartCompresseurK244Props> = ({
           </div>
         )}
       </div>
+      {isDay && (
+        <div className="mt-3 flex flex-wrap justify-end gap-2">
+          {Object.entries(HOUR_COLORS).map(([hkey, color]) => {
+            const label = hkey.replace(/^h(\d+)$/, '$1h');
+            return (
+              <div key={hkey} className="flex items-center gap-2 rounded border bg-white px-3 py-1 shadow-sm dark:bg-transparent" style={{ borderColor: color, ...(colorMode === 'dark' ? { backgroundColor: `${color}33` } : {}) }}>
+                <span className="h-2.5 w-2.5 rounded-full shadow-sm" style={{ backgroundColor: color }} />
+                <span className="text-xs font-semibold tracking-wide" style={{ color }}>{label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {(isWeek || isMonth) && (
+        <div className="mt-3 flex flex-wrap justify-end gap-2">
+          <div className="flex items-center gap-2 rounded border border-[#3c50e0] bg-white px-3 py-1 shadow-sm dark:bg-[#3c50e0]/20">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#3c50e0] shadow-sm" />
+            <span className="text-xs font-semibold tracking-wide text-[#3c50e0]">Conforme</span>
+          </div>
+          <div className="flex items-center gap-2 rounded border border-[#DC2626] bg-white px-3 py-1 shadow-sm dark:bg-[#DC2626]/20">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#DC2626] shadow-sm" />
+            <span className="text-xs font-semibold tracking-wide text-[#DC2626]">Non conforme</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

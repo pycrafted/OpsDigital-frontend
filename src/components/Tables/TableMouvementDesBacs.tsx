@@ -1,4 +1,8 @@
 import React from 'react';
+import { useMouvementBacsLabels } from '../../context/MouvementBacsLabelsContext';
+import { useMouvementBacsBounds } from '../../context/MouvementBacsBoundsContext';
+import { useTableView } from '../../context/TableViewContext';
+import type { MouvementBacsHourKey } from '../../data/mouvementDesBacs';
 
 const columns = [
   'naphta sesulf',
@@ -61,11 +65,14 @@ const LOCK_OPEN = (
   </svg>
 );
 
-const VALIDATE_ICON = (
-  <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
-    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-  </svg>
-);
+
+/** Pour l’affichage : "15.0" → "15", "15.2" → "15.2" (sans .0 inutile). */
+function formatDisplayValue(val: string): string {
+  if (val === '' || val == null) return '';
+  const n = parseFloat(String(val).replace(',', '.'));
+  if (Number.isNaN(n)) return val;
+  return Number.isInteger(n) ? String(n) : String(n);
+}
 
 export interface BacTypeOption {
   id: number;
@@ -89,6 +96,8 @@ interface TableMouvementDesBacsProps {
   bacTypesOptions?: BacTypeOption[];
   /** Dernières données sauvegardées (pour surligner les cellules modifiées) */
   lastSavedData?: { hour: string; values: Record<string, string> }[] | null;
+  sectionTitle?: string;
+  showInlineDate?: boolean;
 }
 
 const createInitialBacTypes = (): Record<ColumnKey, string> => {
@@ -111,7 +120,13 @@ const TableMouvementDesBacs = ({
   showValidateButton = false,
   bacTypesOptions,
   lastSavedData = null,
+  sectionTitle,
+  showInlineDate = false,
 }: TableMouvementDesBacsProps) => {
+  const { getHourLabel, getProductLabel } = useMouvementBacsLabels();
+  const { isOutOfBounds } = useMouvementBacsBounds();
+  const { hideEmptyColumns } = useTableView();
+
   const [internalData, setInternalData] = React.useState(createInitialData);
   const [internalBacs, setInternalBacs] = React.useState<Record<ColumnKey, string>>(createInitialBacTypes);
   const [selectedRows, setSelectedRows] = React.useState<RowKey[]>(() => [...rows]);
@@ -123,6 +138,8 @@ const TableMouvementDesBacs = ({
   const rowTriggerRef = React.useRef<HTMLButtonElement>(null);
   const columnDropdownRef = React.useRef<HTMLDivElement>(null);
   const columnTriggerRef = React.useRef<HTMLButtonElement>(null);
+  /** Cellule en cours d’édition : on affiche la valeur brute pour permettre de saisir "14.5" (le point). */
+  const [focusedCell, setFocusedCell] = React.useState<{ row: RowKey; col: ColumnKey } | null>(null);
 
   const isControlled = controlledData != null && onDataChange != null;
   const data = isControlled ? controlledData : internalData;
@@ -138,6 +155,7 @@ const TableMouvementDesBacs = ({
   };
 
   const handleChange = (row: RowKey, col: ColumnKey, value: string) => {
+    if (value !== '' && !/^-?\d*[.,]?\d*$/.test(value)) return;
     const newData = {
       ...data,
       [row]: { ...(data[row] ?? {}), [col]: value },
@@ -162,9 +180,17 @@ const TableMouvementDesBacs = ({
 
   const filteredRows = rows.filter((r) => selectedRows.includes(r));
   const filteredColumns = columns.filter((c) => selectedColumns.includes(c));
+  const visibleColumns = hideEmptyColumns
+    ? filteredColumns.filter((col) =>
+        filteredRows.some((row) => {
+          const val = (data[row] ?? {})[col];
+          return val !== '' && val != null;
+        })
+      )
+    : filteredColumns;
   const tableRef = React.useRef<HTMLTableElement>(null);
   const totalRows = filteredRows.length;
-  const totalCols = filteredColumns.length;
+  const totalCols = visibleColumns.length;
 
   const handleTableKeyDown = (e: React.KeyboardEvent<HTMLTableElement>) => {
     if (!canEdit) return;
@@ -225,7 +251,7 @@ const TableMouvementDesBacs = ({
   }, []);
 
   const filterTriggerClass =
-    'flex cursor-pointer items-center gap-2 rounded-xl border border-stroke/70 bg-white/90 px-4 py-2.5 text-sm font-medium text-[#3c50e0] shadow-sm transition hover:border-primary/50 hover:bg-white hover:text-primary dark:border-strokedark dark:bg-boxdark dark:text-white dark:hover:border-primary dark:hover:bg-meta-4/80 dark:hover:text-white';
+    'flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white';
   const dropdownPanelClass =
     'absolute left-0 top-full z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark';
 
@@ -237,8 +263,22 @@ const TableMouvementDesBacs = ({
         </div>
       )}
       <div className="flex w-full flex-shrink-0 items-center gap-2">
-        <div className="flex-1" />
+        <div className="flex-1">{sectionTitle && <p className="text-sm font-semibold text-primary dark:text-white">{sectionTitle}</p>}</div>
         <div className="flex flex-wrap items-center justify-center gap-2">
+          {showInlineDate && (
+            <>
+              <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
+                <input
+                  type="date"
+                  value={selectedDate}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => onDateChange(e.target.value)}
+                  className="w-[7.5rem] rounded border-0 bg-transparent py-0.5 text-xs font-bold text-primary outline-none dark:text-white"
+                />
+              </div>
+              <span className="h-4 w-px bg-primary/30" />
+            </>
+          )}
           {/* Créneaux */}
           <div className="relative" ref={rowDropdownRef}>
             <button type="button" ref={rowTriggerRef} onClick={() => setShowRowDropdown(!showRowDropdown)} className={filterTriggerClass}>
@@ -259,7 +299,7 @@ const TableMouvementDesBacs = ({
                       }`}
                     >
                       {isSelected && CHECK}
-                      {row}
+                      {getHourLabel(row as MouvementBacsHourKey)}
                     </button>
                   );
                 })}
@@ -287,7 +327,7 @@ const TableMouvementDesBacs = ({
                       }`}
                     >
                       {isSelected && CHECK}
-                      <span className={isSelected ? 'font-medium' : ''}>{col}</span>
+                      <span className={isSelected ? 'font-medium' : ''}>{getProductLabel(col)}</span>
                     </button>
                   );
                 })}
@@ -301,17 +341,23 @@ const TableMouvementDesBacs = ({
               type="button"
               onClick={() => onValidate()}
               disabled={saving}
-              className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-stroke/70 bg-white/90 px-3 text-green-600 transition hover:border-green-500 hover:bg-white hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-strokedark dark:bg-boxdark dark:text-green-400 dark:hover:border-green-500 dark:hover:bg-meta-4/80 dark:hover:text-green-300"
-              aria-label="Valider et sauvegarder les modifications"
+              className="rounded bg-primary px-6 py-2 text-sm font-medium text-white transition hover:bg-primary/90 disabled:opacity-70"
+              aria-label="Enregistrer les modifications"
             >
-              {VALIDATE_ICON}
-              <span className="text-sm font-medium text-inherit">{saving ? 'Sauvegarde…' : 'Valider'}</span>
+              {saving ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Enregistrement…
+                </span>
+              ) : (
+                'Enregistrer'
+              )}
             </button>
           )}
           <button
             type="button"
             onClick={() => setCanEdit((prev) => !prev)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-stroke/70 bg-white/90 text-primary transition hover:border-primary/50 hover:bg-white dark:border-strokedark dark:bg-boxdark dark:hover:border-primary dark:hover:bg-meta-4/80 dark:text-primary"
+            className="flex shrink-0 items-center justify-center rounded border border-primary bg-white px-2 py-1 text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white"
             aria-label="Modification directe"
           >
             {canEdit ? LOCK_OPEN : LOCK_CLOSED}
@@ -321,7 +367,7 @@ const TableMouvementDesBacs = ({
 
       {/* Tableau — directement sur la page, scrollbar collée sous le tableau */}
       <div className="min-w-0 w-full overflow-auto self-start">
-        <div className="w-max">
+        <div className={`w-max${hideEmptyColumns ? ' mx-auto' : ''}`}>
           <table
             ref={tableRef}
             className="w-max min-w-full border-collapse table-auto"
@@ -333,12 +379,12 @@ const TableMouvementDesBacs = ({
                   className="sticky left-0 z-20 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 border-t-0 border-l-0 bg-[#eff6ff] py-1.5 pl-2 pr-2 dark:border-strokedark dark:border-t-0 dark:border-l-0 dark:bg-[#273342]"
                   aria-label=""
                 />
-                {filteredColumns.map((col) => (
+                {visibleColumns.map((col) => (
                   <th
                     key={col}
                     className="sticky top-0 z-10 min-w-[5.5rem] border-b border-r border-stroke/70 bg-primary py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark"
                   >
-                    {col}
+                    {getProductLabel(col)}
                   </th>
                 ))}
               </tr>
@@ -348,7 +394,7 @@ const TableMouvementDesBacs = ({
                 >
                   Type de bac
                 </th>
-                {filteredColumns.map((col) => (
+                {visibleColumns.map((col) => (
                   <th
                     key={col}
                     className="sticky top-0 z-10 min-w-[6rem] border-b border-r border-stroke/70 bg-primary/95 py-1 px-1.5 dark:border-strokedark"
@@ -377,32 +423,40 @@ const TableMouvementDesBacs = ({
                   className={`group border-b border-stroke/50 odd:bg-slate-100 even:bg-white transition-colors dark:border-strokedark/70 dark:odd:bg-meta-4/30 dark:even:bg-boxdark ${canEdit ? 'hover:bg-slate-200 dark:hover:bg-meta-4/50' : ''}`}
                 >
                   <td className={`sticky left-0 z-10 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 bg-[#3c50e0] py-1 pl-2 pr-2 text-sm font-medium text-white dark:border-strokedark dark:bg-[#3c50e0] dark:text-white ${canEdit ? 'group-hover:bg-[#3c50e0]/90 dark:group-hover:bg-[#3c50e0]/90' : ''}`}>
-                    <span className="block truncate" title={row}>{row}</span>
+                    <span className="block truncate" title={getHourLabel(row as MouvementBacsHourKey)}>{getHourLabel(row as MouvementBacsHourKey)}</span>
                   </td>
-                  {filteredColumns.map((col, colIndex) => {
+                  {visibleColumns.map((col, colIndex) => {
                     const value = (data[row] ?? {})[col] ?? '';
                     const savedRow = lastSavedData?.find((r) => r.hour === row);
                     const savedValue = savedRow?.values?.[col] ?? '';
                     const isModified = savedRow != null && savedValue !== value;
+                    const isFocused = focusedCell != null && focusedCell.row === row && focusedCell.col === col;
+                    const outOfBounds = isOutOfBounds(col, value);
                     return (
                       <td
                         key={col}
-                        className={`min-w-[3.25rem] w-[3.25rem] border-r border-stroke/50 py-0 px-1 dark:border-strokedark/70 ${isModified ? 'bg-[#24303f] dark:bg-[#f1f5f9]' : 'bg-transparent'}`}
+                        className={`min-w-[3.25rem] w-[3.25rem] border-r border-stroke/50 py-0 px-1 dark:border-strokedark/70 ${outOfBounds ? '!bg-red-600 dark:!bg-red-600' : isModified ? 'bg-[#24303f] dark:bg-[#f1f5f9]' : 'bg-transparent'}`}
                       >
                         <input
                           type="text"
-                          value={value}
+                          value={isFocused ? value : formatDisplayValue(value)}
                           readOnly={!canEdit}
+                          onFocus={() => setFocusedCell({ row, col })}
+                          onBlur={() => setFocusedCell(null)}
                           data-cell="true"
                           data-row={rowIndex}
                           data-col={colIndex}
+                          inputMode="decimal"
+                          title={outOfBounds ? "Hors normes : valeur en dehors de l'intervalle min/max (paramètres)" : "Nombre (virgule ou point décimal)"}
                           onChange={(e) => handleChange(row, col, e.target.value)}
                           className={`w-full py-1 pr-2 text-right text-sm font-medium outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 ${
-                            isModified
-                              ? 'bg-[#24303f] text-white placeholder:text-white/50 dark:bg-[#f1f5f9] dark:text-black dark:placeholder:text-black/50'
-                              : 'bg-transparent ' + (canEdit
-                                ? 'text-slate-800 focus:ring-2 focus:ring-primary/20 dark:text-slate-200'
-                                : 'cursor-default text-slate-800 dark:text-slate-200')
+                            outOfBounds
+                              ? '!bg-red-600 !text-white placeholder:!text-white/70 focus:ring-red-400'
+                              : isModified
+                                ? 'bg-[#24303f] text-white placeholder:text-white/50 dark:bg-[#f1f5f9] dark:text-black dark:placeholder:text-black/50'
+                                : 'bg-transparent ' + (canEdit
+                                  ? 'text-slate-800 focus:ring-2 focus:ring-primary/20 dark:text-slate-200'
+                                  : 'cursor-default text-slate-800 dark:text-slate-200')
                           }`}
                           placeholder="—"
                         />
