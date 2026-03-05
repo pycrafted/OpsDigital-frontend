@@ -74,6 +74,9 @@ const ATM_MEROX_SAISIE_FIELDS: ChampSaisie[] = [
 ];
 
 const PRODUCTION_ELECTRICITE_SAISIE_FIELDS: ChampSaisie[] = [
+  { category: 'valeur', label: '30PI027 Press Reseau 10B', key: 'valeur_30PI027 Press Reseau 10B' },
+  { category: 'valeur', label: '30PI050 Press Reseau 6B', key: 'valeur_30PI050 Press Reseau 6B' },
+  { category: 'valeur', label: '10TI193 T°Vap Sortie Surch F101', key: 'valeur_10TI193 T°Vap Sortie Surch F101' },
   { category: 'eau traitée', label: 'Débit Permo A', key: 'eau traitée_Débit Permo A' },
   { category: 'eau traitée', label: 'Débit Permo B', key: 'eau traitée_Débit Permo B' },
   { category: 'production electrique', label: 'Charge', key: 'production electrique_Charge' },

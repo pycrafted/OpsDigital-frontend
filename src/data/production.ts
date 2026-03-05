@@ -15,6 +15,7 @@ export const PRODUCTION_CATEGORIES: CategoryData[] = [
   { category: 'D362', subRows: ['37 LI 018 NIVEAU  D362'] },
   { category: 'H 341', subRows: ['30F1012', '30A1002 O2 Fumées Chem'] },
   { category: 'Autres producteurs', subRows: ['20FI1052 Débit Vap D242', '10FI1052 Débit Vap E143'] },
+  { category: 'valeur', subRows: ['30PI027 Press Reseau 10B', '30PI050 Press Reseau 6B', '10TI193 T°Vap Sortie Surch F101'] },
   { category: 'H302', subRows: ['30FI005 Débit vap H 302', '30QI004 O2 Fumées Chen'] },
   { category: 'eau traitée', subRows: ['Débit Permo A', 'Débit Permo B', 'Niveau T341'] },
   { category: 'AIR/EAU REF', subRows: ['Press AIR instrum 30 PI 040', 'Lancement 30PI 068', 'Débit eau refroidissement 30 FI 036', 'T° eau circulation retour 30 TI 014'] },

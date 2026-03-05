@@ -200,6 +200,7 @@ const Settings = () => {
   const [activeAtmMeroxPanel, setActiveAtmMeroxPanel] = useState<ActivePanel>('libelles');
   const [atmMeroxBoundsState, setAtmMeroxBoundsState] = useState<AtmMeroxBoundsState>({});
   const [activeAtmMeroxBoundsCategory, setActiveAtmMeroxBoundsCategory] = useState<string>(() => ATM_MEROX_CATEGORIES[0]?.category ?? '');
+  const [activeAtmMeroxIndicateursCategory, setActiveAtmMeroxIndicateursCategory] = useState<string>(() => ATM_MEROX_CATEGORIES[0]?.category ?? '');
   const [atmMeroxSavedBounds, setAtmMeroxSavedBounds] = useState(false);
 
   // ── Compresseur K 244 ────────────────────────────────────────────────────
@@ -1390,13 +1391,35 @@ const Settings = () => {
                       </div>
                     )}
                     {atmMeroxTab === 'indicateurs' && (
-                      <div className="grid gap-3 sm:grid-cols-2 max-h-[60vh] overflow-y-auto">
-                        {atmMeroxMeasureKeys.map((key) => (
-                          <div key={key}>
-                            <input id={`atm-meas-${key}`} type="text" value={atmMeroxMeasuresState[key] ?? ''} onChange={(e) => setAtmMeroxMeasuresState((s) => ({ ...s, [key]: e.target.value }))} className={inputClass} aria-label={atmMeroxDefaultMeasureLabels[key] ?? key} />
+                      <>
+                        <div className="no-scrollbar -mx-7 -mt-7 mb-5 border-b border-stroke dark:border-strokedark overflow-x-auto">
+                          <div className="flex min-w-0 shrink-0">
+                            {ATM_MEROX_CATEGORIES.map((cat) => (
+                              <button
+                                key={cat.category || '__empty__'}
+                                type="button"
+                                onClick={() => setActiveAtmMeroxIndicateursCategory(cat.category)}
+                                className={categoryTabBtnClass(activeAtmMeroxIndicateursCategory === cat.category)}
+                                aria-selected={activeAtmMeroxIndicateursCategory === cat.category}
+                                role="tab"
+                              >
+                                {atmMeroxDefaultCategoryLabels[cat.category] ?? (cat.category || '—')}
+                              </button>
+                            ))}
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2 max-h-[60vh] overflow-y-auto">
+                          {(ATM_MEROX_CATEGORIES.find((c) => c.category === activeAtmMeroxIndicateursCategory)?.subRows ?? []).map((subRow) => {
+                            const key = getValueKey(activeAtmMeroxIndicateursCategory, subRow);
+                            return (
+                              <div key={key}>
+                                <p className="mb-1 text-xs text-bodydark2">{atmMeroxDefaultMeasureLabels[key] ?? subRow}</p>
+                                <input id={`atm-meas-${key}`} type="text" value={atmMeroxMeasuresState[key] ?? ''} onChange={(e) => setAtmMeroxMeasuresState((s) => ({ ...s, [key]: e.target.value }))} className={inputClass} aria-label={atmMeroxDefaultMeasureLabels[key] ?? key} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
                     )}
                     <div className="flex justify-end pt-6">
                       <button type="button" onClick={handleAtmMeroxSave} className={saveBtnClass(atmMeroxSaved)}>
