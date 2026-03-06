@@ -198,6 +198,13 @@ const TableCompresseurK245 = ({
     let nextRow = rowIndex;
     let nextCol = colIndex;
     switch (e.key) {
+      case 'Enter':
+        if (showValidateButton) {
+          e.preventDefault();
+          e.stopPropagation();
+          onValidate?.();
+        }
+        return;
       case 'ArrowLeft':
         if (colIndex > 0) nextCol = colIndex - 1;
         else return;
@@ -227,6 +234,8 @@ const TableCompresseurK245 = ({
     }
   };
 
+  const isEmptyState = hideEmptyColumns && visibleCategories.length === 0;
+
   const filterTriggerClass =
     'flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white';
   const dropdownPanelClass =
@@ -242,7 +251,7 @@ const TableCompresseurK245 = ({
       {/* Barre de filtres (centrés) + bouton cadenas à droite */}
       <div className="flex w-full flex-shrink-0 items-center gap-2">
         <div className="flex-1">{sectionTitle && <p className="text-sm font-semibold text-primary dark:text-white">{sectionTitle}</p>}</div>
-        <div className="flex flex-wrap items-center justify-center gap-2">
+        {!isEmptyState && <div className="flex flex-wrap items-center justify-center gap-2">
           {showInlineDate && (
             <>
               <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
@@ -340,7 +349,7 @@ const TableCompresseurK245 = ({
               </div>
             )}
           </div>
-        </div>
+        </div>}
         <div className="flex flex-1 justify-end items-center gap-2">
           {showValidateButton && (
             <button
@@ -360,21 +369,23 @@ const TableCompresseurK245 = ({
               )}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setCanEdit((prev) => !prev)}
-            className="flex shrink-0 items-center justify-center rounded border border-primary bg-white px-2 py-1 text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white"
-            aria-label="Modification directe"
-          >
-            {canEdit ? LOCK_OPEN : LOCK_CLOSED}
-          </button>
+          {!isEmptyState && (
+            <button
+              type="button"
+              onClick={() => setCanEdit((prev) => !prev)}
+              className="flex shrink-0 items-center justify-center rounded border border-primary bg-white px-2 py-1 text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white"
+              aria-label="Modification directe"
+            >
+              {canEdit ? LOCK_OPEN : LOCK_CLOSED}
+            </button>
+          )}
         </div>
       </div>
 
       {hideEmptyColumns && visibleCategories.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 gap-5 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20">
-            <svg className="h-8 w-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <svg className="h-8 w-8 text-primary dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6M3 21h18M3 10l9-7 9 7M5 21V10" />
             </svg>
           </div>
@@ -382,7 +393,7 @@ const TableCompresseurK245 = ({
             <p className="text-base font-semibold text-slate-700 dark:text-slate-200">Aucune donnée disponible</p>
             <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
               Aucune mesure n'a été enregistrée pour le{' '}
-              <span className="font-medium text-primary">
+              <span className="font-medium text-primary dark:text-white">
                 {new Date(selectedDate + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
               </span>
             </p>

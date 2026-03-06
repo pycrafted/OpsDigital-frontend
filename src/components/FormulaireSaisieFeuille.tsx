@@ -948,6 +948,7 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
                     onFocus={() => setFocusedFieldKey(key)}
                     onBlur={() => setFocusedFieldKey(null)}
                     onChange={(e) => handleChange(key, e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && isDirty) { e.preventDefault(); handleSave(); } }}
                     placeholder="—"
                     className="w-full sm:max-w-xs rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow outline-none placeholder:text-primary/40 focus:ring-2 focus:ring-primary/20 dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white dark:placeholder:text-white/40"
                   />
