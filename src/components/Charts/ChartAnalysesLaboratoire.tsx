@@ -46,6 +46,35 @@ function formatYAxisLabel(val: number): string {
   return Number.isFinite(val) ? Number(val.toFixed(2)).toString() : '';
 }
 
+/** Construit un tooltip custom dont la couleur du marqueur reflète la conformité du point.
+ *  Si `conformeIndices` est fourni, les points absents des deux tableaux (pas de donnée) n'affichent aucun tooltip. */
+function buildTooltipCustom(
+  outOfBoundsIndices: number[],
+  categories: string[],
+  conformeColor = '#3c50e0',
+  oobColor = '#DC2626',
+  conformeIndices?: number[],
+) {
+  return ({ seriesIndex, dataPointIndex, w }: { seriesIndex: number; dataPointIndex: number; w: any }) => {
+    if (conformeIndices !== undefined) {
+      const hasData = outOfBoundsIndices.includes(dataPointIndex) || conformeIndices.includes(dataPointIndex);
+      if (!hasData) return '<div style="display:none"></div>';
+    }
+    const val: number = w.globals.series[seriesIndex]?.[dataPointIndex] ?? 0;
+    const isOob = outOfBoundsIndices.includes(dataPointIndex);
+    const color = isOob ? oobColor : conformeColor;
+    const formatted = formatYAxisLabel(val);
+    const catLabel = categories[dataPointIndex] ?? '';
+    return (
+      `<div class="apexcharts-tooltip-title" style="font-size:12px;padding:4px 10px;">${catLabel}</div>` +
+      `<div style="display:flex;align-items:center;padding:5px 10px;font-size:13px;">` +
+      `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:8px;flex-shrink:0;"></span>` +
+      `<span>${formatted}</span>` +
+      `</div>`
+    );
+  };
+}
+
 /** Jours de la semaine (abscisses alignées sur la page tableaux : 3 relevés 7h, 15h, 23h par jour) */
 const WEEK_DAY_LABELS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'] as const;
 
@@ -927,7 +956,7 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
           },
         },
         tooltip: {
-          y: { formatter: (val: number) => formatYAxisLabel(val) },
+          custom: buildTooltipCustom(outOfBoundsIndices, categories, '#3c50e0', '#DC2626', conformeIndices),
         },
       };
     }
@@ -1020,7 +1049,7 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
           max: (max: number) => max * 1.1,
           labels: { minWidth: 50, style: { fontSize: '11px' }, formatter: formatYAxisLabel },
         },
-        tooltip: { y: { formatter: (val: number) => formatYAxisLabel(val) } },
+        tooltip: { custom: buildTooltipCustom(outOfBoundsIndices, categoriesMonth, '#3c50e0', '#DC2626', conformeIndices) },
       };
     }
 
@@ -1101,7 +1130,7 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
           max: (max: number) => max * 1.1,
           labels: { minWidth: 50, style: { fontSize: '11px' }, formatter: formatYAxisLabel },
         },
-        tooltip: { y: { formatter: (val: number) => formatYAxisLabel(val) } },
+        tooltip: { custom: buildTooltipCustom(outOfBoundsIndices, categoriesQuarter) },
       };
     }
 
@@ -1182,7 +1211,7 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
           max: (max: number) => max * 1.1,
           labels: { minWidth: 50, style: { fontSize: '11px' }, formatter: formatYAxisLabel },
         },
-        tooltip: { y: { formatter: (val: number) => formatYAxisLabel(val) } },
+        tooltip: { custom: buildTooltipCustom(outOfBoundsIndices, categoriesSemester) },
       };
     }
 
@@ -1263,7 +1292,7 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
           max: (max: number) => max * 1.1,
           labels: { minWidth: 50, style: { fontSize: '11px' }, formatter: formatYAxisLabel },
         },
-        tooltip: { y: { formatter: (val: number) => formatYAxisLabel(val) } },
+        tooltip: { custom: buildTooltipCustom(outOfBoundsIndices, categoriesYear) },
       };
     }
 
