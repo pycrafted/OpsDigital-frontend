@@ -222,7 +222,7 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
                   : isAnalysesLaboratoire && isShowAllTablesPage
                     ? 'w-full px-4 pt-0 pb-4 md:px-6 md:pb-6 2xl:px-10 2xl:pb-10'
                     : isGraphiquesPage && isShowAllGraphsPage
-                      ? 'w-full px-4 pt-0 pb-4 md:px-6 md:pb-6 2xl:px-10 2xl:pb-10'
+                      ? 'mx-auto max-w-screen-2xl px-4 pt-0 pb-4 md:px-6 md:pb-6 2xl:px-10 2xl:pb-10'
                       : isGraphiquesPage
                         ? 'mx-auto max-w-screen-2xl px-4 pt-0.5 pb-1 md:px-6 md:pt-1 md:pb-2 2xl:px-10 2xl:pt-2 2xl:pb-3'
                         : 'mx-auto max-w-screen-2xl px-4 pt-0.5 pb-4 md:px-6 md:pt-1 md:pb-6 2xl:px-10 2xl:pt-2 2xl:pb-10'
