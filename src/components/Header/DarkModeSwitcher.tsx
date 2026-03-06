@@ -15,7 +15,7 @@ const DarkModeSwitcher = () => {
     <button
       type="button"
       onClick={toggleMode}
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-primary dark:text-bodydark transition hover:bg-stroke hover:text-primary dark:hover:bg-meta-4/50 dark:hover:text-white"
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-primary dark:text-white transition hover:bg-stroke hover:text-primary dark:hover:bg-meta-4/50 dark:hover:text-white"
       aria-label={isDark ? 'Passer en mode clair' : 'Passer en mode sombre'}
     >
       {isDark ? (

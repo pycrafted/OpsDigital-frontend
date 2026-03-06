@@ -904,10 +904,10 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
                     key={cat || 'Divers'}
                     type="button"
                     onClick={() => setSelectedCategory(cat)}
-                    className={`rounded-xl border px-4 py-2.5 text-sm font-medium shadow-sm transition ${
+                    className={`rounded border px-3 py-1 text-xs font-bold shadow transition ${
                       isSelected
-                        ? 'border-primary bg-primary text-white dark:border-primary dark:bg-primary'
-                        : 'border-stroke/70 bg-white/90 text-primary hover:border-primary/50 hover:bg-white hover:text-primary dark:border-strokedark dark:bg-boxdark dark:text-white dark:hover:border-primary dark:hover:bg-meta-4/80 dark:hover:text-white'
+                        ? 'border-primary bg-primary text-white'
+                        : 'border-primary bg-white text-primary hover:bg-primary/10 dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white dark:hover:bg-primary/30'
                     }`}
                   >
                     {label}
@@ -965,7 +965,7 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
                 type="button"
                 onClick={handleSave}
                 disabled={savingBackend || !isDirty}
-                className="rounded bg-primary px-6 py-2 text-sm font-medium text-white transition hover:bg-primary/90 disabled:opacity-70"
+                className="rounded border border-primary bg-primary px-6 py-1 text-xs font-bold text-white shadow transition hover:bg-primary/90 disabled:opacity-70"
               >
                 {savingBackend ? (
                   <span className="flex items-center gap-2">

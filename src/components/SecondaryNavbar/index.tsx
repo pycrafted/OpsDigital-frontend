@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import LogoIcon from '../../images/logo/logo-icon.svg';
 import DarkModeSwitcher from '../Header/DarkModeSwitcher';
@@ -75,7 +74,7 @@ const SecondaryNavbar = () => {
           <button
             type="button"
             onClick={logout}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-primary dark:text-bodydark transition hover:bg-stroke hover:text-primary dark:hover:bg-meta-4/50 dark:hover:text-white"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-primary dark:text-white transition hover:bg-stroke hover:text-primary dark:hover:bg-meta-4/50 dark:hover:text-white"
             aria-label="Déconnexion"
           >
             <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
@@ -84,7 +83,7 @@ const SecondaryNavbar = () => {
           </button>
           <Link
             to="/settings"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-primary dark:text-bodydark transition hover:bg-stroke hover:text-primary dark:hover:bg-meta-4/50 dark:hover:text-white"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-primary dark:text-white transition hover:bg-stroke hover:text-primary dark:hover:bg-meta-4/50 dark:hover:text-white"
             aria-label="Paramètres"
           >
             <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
