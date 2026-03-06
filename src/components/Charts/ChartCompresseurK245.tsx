@@ -517,7 +517,8 @@ const ChartCompresseurK245: React.FC<ChartCompresseurK245Props> = ({
         fill: { opacity: 1 },
         yaxis: {
           title: { text: indicateurLabel || 'Valeur', style: { fontSize: '12px' } },
-          labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
+          max: (max: number) => max * 1.1,
+          labels: { minWidth: 50, style: { fontSize: '11px' }, formatter: formatYAxisLabel },
         },
         tooltip: { y: { formatter: (val: number) => formatYAxisLabel(val) } },
       };
@@ -621,8 +622,8 @@ const ChartCompresseurK245: React.FC<ChartCompresseurK245Props> = ({
         yaxis: {
           title: { text: indicateurLabel || 'Valeur', style: { fontSize: '12px' } },
           min: 0,
-          max: undefined,
-          labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
+          max: (max: number) => max * 1.1,
+          labels: { minWidth: 50, style: { fontSize: '11px' }, formatter: formatYAxisLabel },
         },
         tooltip: {
           x: {
@@ -732,7 +733,8 @@ const ChartCompresseurK245: React.FC<ChartCompresseurK245Props> = ({
         },
         yaxis: {
           title: { text: indicateurLabel || 'Valeur', style: { fontSize: '12px' } },
-          labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
+          max: (max: number) => max * 1.1,
+          labels: { minWidth: 50, style: { fontSize: '11px' }, formatter: formatYAxisLabel },
         },
         tooltip: {
           x: {
@@ -831,7 +833,8 @@ const ChartCompresseurK245: React.FC<ChartCompresseurK245Props> = ({
         },
         yaxis: {
           title: { text: indicateurLabel || 'Valeur', style: { fontSize: '12px' } },
-          labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
+          max: (max: number) => max * 1.1,
+          labels: { minWidth: 50, style: { fontSize: '11px' }, formatter: formatYAxisLabel },
         },
         tooltip: {
           x: {
@@ -922,7 +925,8 @@ const ChartCompresseurK245: React.FC<ChartCompresseurK245Props> = ({
       },
       yaxis: {
         title: { text: indicateurLabel || 'Valeur', style: { fontSize: '12px' } },
-        labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
+        max: (max: number) => max * 1.1,
+        labels: { minWidth: 50, style: { fontSize: '11px' }, formatter: formatYAxisLabel },
       },
       tooltip: {
         x: {

@@ -774,7 +774,9 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
             text: selectedMeasure || 'Valeur',
             style: { fontSize: '12px' },
           },
+          max: (max: number) => max * 1.1,
           labels: {
+            minWidth: 50,
             style: { fontSize: '11px' },
             formatter: formatYAxisLabel,
           },
@@ -917,8 +919,9 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
             style: { fontSize: '12px' },
           },
           min: 0,
-          max: 100,
+          max: (max: number) => max * 1.1,
           labels: {
+            minWidth: 50,
             style: { fontSize: '11px' },
             formatter: formatYAxisLabel,
           },
@@ -1014,7 +1017,8 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
         },
         yaxis: {
           title: { text: selectedMeasure || 'Valeur', style: { fontSize: '12px' } },
-          labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
+          max: (max: number) => max * 1.1,
+          labels: { minWidth: 50, style: { fontSize: '11px' }, formatter: formatYAxisLabel },
         },
         tooltip: { y: { formatter: (val: number) => formatYAxisLabel(val) } },
       };
@@ -1094,7 +1098,8 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
         },
         yaxis: {
           title: { text: selectedMeasure || 'Valeur', style: { fontSize: '12px' } },
-          labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
+          max: (max: number) => max * 1.1,
+          labels: { minWidth: 50, style: { fontSize: '11px' }, formatter: formatYAxisLabel },
         },
         tooltip: { y: { formatter: (val: number) => formatYAxisLabel(val) } },
       };
@@ -1174,7 +1179,8 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
         },
         yaxis: {
           title: { text: selectedMeasure || 'Valeur', style: { fontSize: '12px' } },
-          labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
+          max: (max: number) => max * 1.1,
+          labels: { minWidth: 50, style: { fontSize: '11px' }, formatter: formatYAxisLabel },
         },
         tooltip: { y: { formatter: (val: number) => formatYAxisLabel(val) } },
       };
@@ -1254,7 +1260,8 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
         },
         yaxis: {
           title: { text: selectedMeasure || 'Valeur', style: { fontSize: '12px' } },
-          labels: { style: { fontSize: '11px' }, formatter: formatYAxisLabel },
+          max: (max: number) => max * 1.1,
+          labels: { minWidth: 50, style: { fontSize: '11px' }, formatter: formatYAxisLabel },
         },
         tooltip: { y: { formatter: (val: number) => formatYAxisLabel(val) } },
       };
@@ -1370,6 +1377,7 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
           text: selectedMeasure || 'Valeur',
           style: { fontSize: '12px' },
         },
+        max: (max: number) => max * 1.1,
         labels: {
           style: { fontSize: '11px' },
           formatter: formatYAxisLabel,

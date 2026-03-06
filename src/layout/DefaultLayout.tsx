@@ -178,7 +178,7 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
                 )}
                 {duration === 'week' && (
                   <input type="week" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}
-                    className="w-[7rem] rounded border-0 bg-transparent py-0.5 text-xs font-bold text-primary outline-none dark:text-white" />
+                    className="w-[8rem] rounded border-0 bg-transparent py-0.5 text-xs font-bold text-primary outline-none dark:text-white" />
                 )}
                 {duration === 'month' && (
                   <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}

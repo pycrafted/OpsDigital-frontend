@@ -1369,7 +1369,7 @@ const AnalysesLaboratoireGraphique = () => {
       </div>
       <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
         {duration === 'day' && <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-[7.5rem] rounded border-0 bg-transparent py-0.5 text-xs font-bold text-primary outline-none dark:text-white" />}
-        {duration === 'week' && <input type="week" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className="w-[7rem] rounded border-0 bg-transparent py-0.5 text-xs font-bold text-primary outline-none dark:text-white" />}
+        {duration === 'week' && <input type="week" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className="w-[8rem] rounded border-0 bg-transparent py-0.5 text-xs font-bold text-primary outline-none dark:text-white" />}
         {duration === 'month' && <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="w-[6.5rem] rounded border-0 bg-transparent py-0.5 text-xs font-bold text-primary outline-none dark:text-white" />}
       </div>
     </>
