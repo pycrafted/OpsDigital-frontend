@@ -949,7 +949,7 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
                     onBlur={() => setFocusedFieldKey(null)}
                     onChange={(e) => handleChange(key, e.target.value)}
                     placeholder="—"
-                    className="w-full sm:max-w-xs rounded-lg border border-stroke bg-white py-2 px-3 text-sm text-black placeholder:text-bodydark2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-strokedark dark:bg-meta-4 dark:text-white dark:focus:border-primary"
+                    className="w-full sm:max-w-xs rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow outline-none placeholder:text-primary/40 focus:ring-2 focus:ring-primary/20 dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white dark:placeholder:text-white/40"
                   />
                 </div>
               );
