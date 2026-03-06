@@ -383,8 +383,8 @@ const TableMouvementDesBacs = ({
           </div>
         </div>
       ) : (
-      <div className="min-w-0 w-full overflow-auto self-start">
-        <div className={`w-max${hideEmptyColumns ? ' mx-auto' : ''}`}>
+      <div className="inline-block max-h-[calc(100vh-14rem)] w-full max-w-full overflow-auto">
+        <div className={`min-h-full w-max${hideEmptyColumns ? ' mx-auto' : ''}`}>
           <table
             ref={tableRef}
             className="w-max min-w-full border-collapse table-auto"

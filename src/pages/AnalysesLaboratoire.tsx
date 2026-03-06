@@ -596,7 +596,7 @@ const AnalysesLaboratoire = () => {
       />
     </div>
   ) : isMouvementDesBacs ? (
-    <div className="flex min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden">
+    <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
       <TableMouvementDesBacs
         selectedDate={selectedDate}
         onDateChange={setSelectedDate}
@@ -765,7 +765,7 @@ const AnalysesLaboratoire = () => {
         {/* Mouvement des bacs */}
         <div className="flex flex-col gap-6 overflow-visible">
           <div className="flex min-w-0 flex-col items-center overflow-visible">
-            <div className="flex min-w-0 w-full max-w-full flex-col overflow-visible">
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
               <TableMouvementDesBacs
                 selectedDate={selectedDate}
                 onDateChange={setSelectedDate}
