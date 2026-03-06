@@ -630,18 +630,16 @@ const ChartGaz: React.FC<ChartGazProps> = ({
           toolbar: { show: false },
           animations: { dynamicAnimation: { enabled: false } },
         },
-        annotations: outOfBoundsIndices.length > 0
-          ? {
-              xaxis: outOfBoundsIndices.map((dataPointIndex) => ({
-                x: categoriesMonth[dataPointIndex],
-                borderColor: oobRed,
-                strokeWidth: 2,
-                opacity: 1,
-                strokeDashArray: 0,
-                label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
-              })),
-            }
-          : undefined,
+        annotations: {
+          xaxis: outOfBoundsIndices.map((dataPointIndex) => ({
+            x: categoriesMonth[dataPointIndex],
+            borderColor: oobRed,
+            strokeWidth: 2,
+            opacity: 1,
+            strokeDashArray: 0,
+            label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
+          })),
+        },
         stroke: { width: 2, curve: 'straight' },
         fill: {
           type: 'gradient',
@@ -731,18 +729,16 @@ const ChartGaz: React.FC<ChartGazProps> = ({
           toolbar: { show: false },
           animations: { dynamicAnimation: { enabled: false } },
         },
-        annotations: outOfBoundsIndices.length > 0
-          ? {
-              xaxis: outOfBoundsIndices.map((dataPointIndex) => ({
-                x: categoriesQuarter[dataPointIndex],
-                borderColor: oobRed,
-                strokeWidth: 2,
-                opacity: 1,
-                strokeDashArray: 0,
-                label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
-              })),
-            }
-          : undefined,
+        annotations: {
+          xaxis: outOfBoundsIndices.map((dataPointIndex) => ({
+            x: categoriesQuarter[dataPointIndex],
+            borderColor: oobRed,
+            strokeWidth: 2,
+            opacity: 1,
+            strokeDashArray: 0,
+            label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
+          })),
+        },
         stroke: { width: 2, curve: 'straight' },
         fill: {
           type: 'gradient',

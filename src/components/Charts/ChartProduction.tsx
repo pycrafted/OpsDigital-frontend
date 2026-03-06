@@ -498,18 +498,16 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
           dropShadow: { enabled: true, color: '#623CEA14', top: 10, blur: 4, left: 0, opacity: 0.1 },
           toolbar: { show: false },
         },
-        annotations: outOfBoundsIndices.length > 0
-          ? {
-              xaxis: outOfBoundsIndices.map((dataPointIndex) => ({
-                x: categoriesWeek[dataPointIndex],
-                borderColor: oobRed,
-                strokeWidth: 2,
-                opacity: 1,
-                strokeDashArray: 0,
-                label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
-              })),
-            }
-          : undefined,
+        annotations: {
+          xaxis: outOfBoundsIndices.map((dataPointIndex) => ({
+            x: categoriesWeek[dataPointIndex],
+            borderColor: oobRed,
+            strokeWidth: 2,
+            opacity: 1,
+            strokeDashArray: 0,
+            label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
+          })),
+        },
         stroke: { width: 2, curve: 'straight' },
         fill: {
           type: 'gradient',
@@ -609,18 +607,16 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
           dropShadow: { enabled: true, color: '#623CEA14', top: 10, blur: 4, left: 0, opacity: 0.1 },
           toolbar: { show: false },
         },
-        annotations: outOfBoundsIndices.length > 0
-          ? {
-              xaxis: outOfBoundsIndices.map((dataPointIndex) => ({
-                x: categoriesMonth[dataPointIndex],
-                borderColor: oobRed,
-                strokeWidth: 2,
-                opacity: 1,
-                strokeDashArray: 0,
-                label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
-              })),
-            }
-          : undefined,
+        annotations: {
+          xaxis: outOfBoundsIndices.map((dataPointIndex) => ({
+            x: categoriesMonth[dataPointIndex],
+            borderColor: oobRed,
+            strokeWidth: 2,
+            opacity: 1,
+            strokeDashArray: 0,
+            label: { borderColor: oobRed, style: { fontSize: '0px' }, text: '' },
+          })),
+        },
         stroke: { width: 2, curve: 'straight' },
         fill: {
           type: 'gradient',

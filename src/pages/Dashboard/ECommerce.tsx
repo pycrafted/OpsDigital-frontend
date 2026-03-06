@@ -101,9 +101,9 @@ const ECommerce: React.FC = () => {
       {!SHOW_DASHBOARD_CARDS && (
         <div className="rounded-xl border border-stroke bg-white px-6 py-12 shadow-default dark:border-strokedark dark:bg-boxdark sm:px-10 sm:py-16">
           <div className="flex flex-col items-center justify-center text-center">
-            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border-2 border-primary/20 bg-primary/5 dark:bg-primary/10">
+            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border-2 border-primary/20 bg-primary/5 dark:border-white/20 dark:bg-white/10">
               <svg
-                className="h-8 w-8 text-primary"
+                className="h-8 w-8 text-primary dark:text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
