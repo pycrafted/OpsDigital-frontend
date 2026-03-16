@@ -38,6 +38,7 @@ import { TableauxFilterProvider } from './context/TableauxFilterContext';
 import { SaisieVisibilityProvider } from './context/SaisieVisibilityContext';
 import { DisplayModeProvider } from './context/DisplayModeContext';
 import { RenommageProvider } from './context/RenommageContext';
+import { TagsIp21Provider } from './context/TagsIp21Context';
 
 function App() {
   const [loading, setLoading] = useState<boolean>(true);
@@ -102,6 +103,7 @@ function App() {
           <ProductionBoundsProvider>
           <ReformateurLabelsProvider>
           <ReformateurBoundsProvider>
+          <TagsIp21Provider>
           <RenommageProvider>
           <DisplayModeProvider>
           <SaisieVisibilityProvider>
@@ -248,6 +250,7 @@ function App() {
           </SaisieVisibilityProvider>
           </DisplayModeProvider>
           </RenommageProvider>
+          </TagsIp21Provider>
           </ReformateurBoundsProvider>
           </ReformateurLabelsProvider>
           </ProductionBoundsProvider>

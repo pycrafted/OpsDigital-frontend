@@ -5,6 +5,7 @@ import { FEUILLES_CONFIG } from '../types/feuilles';
 import { useSaisieVisibility } from '../context/SaisieVisibilityContext';
 import { useDisplayMode, DisplayMode } from '../context/DisplayModeContext';
 import { useRenommage } from '../context/RenommageContext';
+import { useTagsIp21, FieldSource } from '../context/TagsIp21Context';
 
 const FEUILLES_SORTED = [...FEUILLES_CONFIG].sort((a, b) => a.title.localeCompare(b.title, 'fr'));
 
@@ -433,6 +434,229 @@ const RenommageSection: React.FC = () => {
   );
 };
 
+/* ───────────── Tags IP21 ───────────── */
+
+const SOURCE_OPTIONS: { id: FieldSource; label: string }[] = [
+  { id: 'manual', label: 'Manuel' },
+  { id: 'sap', label: 'SAP' },
+  { id: 'ip21', label: 'IP21' },
+];
+
+const TagsIp21Section: React.FC = () => {
+  const { config, getFieldConfig, setFieldSource, setFieldTag } = useTagsIp21();
+  const { getFeuilleTitle, getFieldLabel } = useRenommage();
+  const [selectedFeuilleId, setSelectedFeuilleId] = useState<string | null>(null);
+  const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({});
+  const [refreshed, setRefreshed] = useState(false);
+
+  const selectedFeuille = selectedFeuilleId
+    ? FEUILLES_CONFIG.find((f) => f.id === selectedFeuilleId) ?? null
+    : null;
+
+  const categoryGroups = selectedFeuille
+    ? Array.from(
+        selectedFeuille.fields.reduce((map, field) => {
+          const cat = field.category || '';
+          if (!map.has(cat)) map.set(cat, []);
+          map.get(cat)!.push(field);
+          return map;
+        }, new Map<string, typeof selectedFeuille.fields>()),
+      )
+    : [];
+
+  const ip21CountForFeuille = (feuilleId: string) =>
+    Object.values(config[feuilleId] ?? {}).filter((v) => v.source === 'ip21').length;
+
+  const toggleCat = (cat: string) =>
+    setExpandedCats((prev) => ({ ...prev, [cat]: prev[cat] === false ? true : false }));
+
+  const isCatExpanded = (cat: string) => expandedCats[cat] !== false;
+
+  const handleRefresh = () => {
+    window.dispatchEvent(new CustomEvent('ip21-tags-updated'));
+    setRefreshed(true);
+    setTimeout(() => setRefreshed(false), 2000);
+  };
+
+  return (
+    <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark overflow-hidden">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between gap-4 border-b border-stroke px-5 py-3 dark:border-strokedark">
+        <p className="text-xs text-bodydark dark:text-bodydark2">
+          Configurez la source de chaque champ : <span className="font-semibold text-black dark:text-white">Manuel</span>, <span className="font-semibold text-black dark:text-white">SAP</span> ou <span className="font-semibold text-primary">IP21</span> (avec tag).
+        </p>
+        <button
+          type="button"
+          onClick={handleRefresh}
+          className={`flex shrink-0 items-center gap-1.5 rounded border px-3 py-1.5 text-xs font-bold shadow transition ${
+            refreshed
+              ? 'border-success bg-success text-white'
+              : 'border-primary bg-primary text-white hover:bg-primary/90'
+          }`}
+        >
+          {refreshed ? (
+            <>
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+              Appliqué
+            </>
+          ) : (
+            <>
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* 2-column layout */}
+      <div
+        className="grid grid-cols-1 md:grid-cols-[200px_1fr] divide-y divide-stroke dark:divide-strokedark md:divide-x md:divide-y-0"
+        style={{ minHeight: '480px' }}
+      >
+        {/* Left — Tableau list */}
+        <div className="flex flex-col">
+          <div className="border-b border-stroke bg-[#f0f9ff] px-4 py-2 dark:border-strokedark dark:bg-[#1a222c]">
+            <span className="text-xs font-bold uppercase tracking-wide text-bodydark dark:text-bodydark2">Tableau</span>
+          </div>
+          {FEUILLES_SORTED.map((feuille) => {
+            const count = ip21CountForFeuille(feuille.id);
+            const isSelected = selectedFeuilleId === feuille.id;
+            return (
+              <button
+                key={feuille.id}
+                type="button"
+                onClick={() => { setSelectedFeuilleId(feuille.id); setExpandedCats({}); }}
+                className={`flex items-center justify-between gap-2 border-b border-stroke px-4 py-2.5 text-left transition last:border-b-0 dark:border-strokedark ${
+                  isSelected ? 'bg-primary/10 dark:bg-white/10' : 'hover:bg-stroke dark:hover:bg-meta-4'
+                }`}
+              >
+                <span className={`truncate text-xs font-semibold ${isSelected ? 'text-primary dark:text-white' : 'text-black dark:text-white'}`}>
+                  {getFeuilleTitle(feuille.id)}
+                </span>
+                {count > 0 && (
+                  <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary dark:bg-white/10 dark:text-white">
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Right — Field list */}
+        <div className="flex flex-col overflow-y-auto">
+          {selectedFeuille ? (
+            <>
+              <div className="border-b border-stroke bg-[#f0f9ff] px-4 py-2 dark:border-strokedark dark:bg-[#1a222c]">
+                <span className="text-xs font-bold uppercase tracking-wide text-bodydark dark:text-bodydark2">
+                  {getFeuilleTitle(selectedFeuille.id)} — {selectedFeuille.fields.length} champs
+                </span>
+              </div>
+              {categoryGroups.map(([cat, fields]) => {
+                const displayCat = cat.startsWith('__empty__') ? cat.slice(9) : cat || 'Général';
+                const expanded = isCatExpanded(cat);
+                const ip21InCat = fields.filter(
+                  (f) => getFieldConfig(selectedFeuille.id, f.key).source === 'ip21',
+                ).length;
+                return (
+                  <div key={cat} className="border-b border-stroke dark:border-strokedark last:border-b-0">
+                    {/* Category header */}
+                    <button
+                      type="button"
+                      onClick={() => toggleCat(cat)}
+                      className="flex w-full items-center gap-2 bg-stroke/30 px-4 py-2 text-left transition hover:bg-stroke dark:bg-meta-4/20 dark:hover:bg-meta-4"
+                    >
+                      <svg
+                        className={`h-3.5 w-3.5 shrink-0 text-bodydark transition-transform ${expanded ? 'rotate-90' : ''}`}
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                      <span className="flex-1 text-xs font-bold uppercase tracking-wide text-black dark:text-white">
+                        {displayCat}
+                      </span>
+                      <span className="text-xs text-bodydark dark:text-bodydark2">{fields.length} champs</span>
+                      {ip21InCat > 0 && (
+                        <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary dark:bg-white/10 dark:text-white">
+                          {ip21InCat} IP21
+                        </span>
+                      )}
+                    </button>
+
+                    {/* Fields */}
+                    {expanded && (
+                      <div className="divide-y divide-stroke dark:divide-strokedark">
+                        {fields.map((field) => {
+                          const label = getFieldLabel(selectedFeuille.id, field.key, field.label);
+                          const fc = getFieldConfig(selectedFeuille.id, field.key);
+                          return (
+                            <div key={field.key} className="flex flex-wrap items-center gap-3 px-5 py-2.5">
+                              {/* Field name */}
+                              <span className="min-w-[10rem] flex-1 text-xs text-black dark:text-white">{label}</span>
+
+                              {/* Source buttons */}
+                              <div className="flex items-center gap-1">
+                                {SOURCE_OPTIONS.map((src) => {
+                                  const isActive = fc.source === src.id;
+                                  const activeClass =
+                                    src.id === 'ip21'
+                                      ? 'border-primary bg-primary text-white'
+                                      : src.id === 'sap'
+                                        ? 'border-[#e5a000] bg-[#e5a000] text-white'
+                                        : 'border-[#64748b] bg-[#64748b] text-white';
+                                  return (
+                                    <button
+                                      key={src.id}
+                                      type="button"
+                                      onClick={() => setFieldSource(selectedFeuille.id, field.key, src.id)}
+                                      className={`rounded border px-2 py-0.5 text-[10px] font-bold transition ${
+                                        isActive
+                                          ? activeClass
+                                          : 'border-stroke bg-white text-bodydark hover:border-primary hover:text-primary dark:border-strokedark dark:bg-boxdark dark:text-bodydark2 dark:hover:border-white dark:hover:text-white'
+                                      }`}
+                                    >
+                                      {src.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              {/* IP21 tag input */}
+                              {fc.source === 'ip21' && (
+                                <input
+                                  type="text"
+                                  value={fc.ip21Tag}
+                                  onChange={(e) => setFieldTag(selectedFeuille.id, field.key, e.target.value)}
+                                  placeholder="Ex : 17FC001.MEAS"
+                                  className="w-40 rounded border border-primary bg-white px-2 py-0.5 font-mono text-xs text-black outline-none dark:bg-boxdark dark:text-white"
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </>
+          ) : (
+            <div className="flex flex-1 items-center justify-center p-8">
+              <span className="text-xs text-bodydark dark:text-bodydark2">
+                Sélectionnez un tableau pour configurer ses champs
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ParametragePage: React.FC = () => {
   const { search } = useLocation();
   const section = new URLSearchParams(search).get('section') ?? 'visibilite-saisie';
@@ -444,11 +668,7 @@ const ParametragePage: React.FC = () => {
         {section === 'visibilite-saisie' && <VisibiliteSaisieSection />}
         {section === 'mode-affichage' && <ModeAffichageSection />}
         {section === 'renommage' && <RenommageSection />}
-        {section === 'tags-ip21' && (
-          <div className="rounded-sm border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
-            <p className="text-sm text-bodydark dark:text-bodydark2">Section Tags IP21 — à venir</p>
-          </div>
-        )}
+        {section === 'tags-ip21' && <TagsIp21Section />}
       </div>
     </>
   );
