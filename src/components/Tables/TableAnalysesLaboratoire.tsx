@@ -43,17 +43,6 @@ const CHECK = (
   </svg>
 );
 
-const LOCK_CLOSED = (
-  <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
-    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-  </svg>
-);
-
-const LOCK_OPEN = (
-  <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
-    <path fillRule="evenodd" d="M14.5 1A4.5 4.5 0 0010 5.5V9H3a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-1V5.5A4.5 4.5 0 0014.5 1zM12 9V5.5a2 2 0 10-4 0V9h4z" clipRule="evenodd" />
-  </svg>
-);
 
 
 /** Pour l’affichage : "15.0" → "15", "15.2" → "15.2" (sans .0 inutile). */
@@ -67,12 +56,11 @@ function formatDisplayValue(val: string): string {
 const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ data, onDataChange, selectedDate, onDateChange, loading = false, onValidate, saving = false, showValidateButton = false, lastSavedData = null, allRowsVisible = false, sectionTitle, showInlineDate = false }) => {
   const { getProductLabel, getHourLabel, getMeasureLabel } = useAnalysesLaboLabels();
   const { isOutOfBounds } = useAnalysesLaboBounds();
-  const { hideEmptyColumns } = useTableView();
+  const { hideEmptyColumns, canEdit } = useTableView();
   const measures = React.useMemo(() => data.map((row) => row.property), [data]);
   const [selectedHours, setSelectedHours] = React.useState<string[]>(['h7', 'h15', 'h23']);
   const [selectedProducts, setSelectedProducts] = React.useState<string[]>(() => [...products]);
   const [selectedMeasures, setSelectedMeasures] = React.useState<string[]>(() => measures);
-  const [canEdit, setCanEdit] = React.useState(false);
 
   // Quand les données changent (ex. chargement API pour une autre date), afficher toutes les lignes
   // en synchronisant la sélection des mesures avec les libellés reçus (backend peut utiliser une casse différente).
@@ -353,16 +341,6 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
               ) : (
                 'Enregistrer'
               )}
-            </button>
-          )}
-          {!isEmptyState && (
-            <button
-              type="button"
-              onClick={() => setCanEdit((prev) => !prev)}
-              className="flex shrink-0 items-center justify-center rounded border border-primary bg-white px-2 py-1 text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white"
-              aria-label="Modification directe"
-            >
-              {canEdit ? LOCK_OPEN : LOCK_CLOSED}
             </button>
           )}
         </div>

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRenommage } from '../context/RenommageContext';
 import {
   COMPRESSEUR_K244_CATEGORY_OPTIONS,
   FeuilleConfig,
@@ -7,7 +8,6 @@ import {
 } from '../types/feuilles';
 import {
   createInitialReformateurData,
-  reformateurHourLabels,
   type HourRow as ReformateurHourRow,
 } from '../data/reformateur';
 import {
@@ -36,6 +36,18 @@ import { fetchGazByDate, saveGazBulk } from '../api/gaz';
 import { fetchAtmMeroxByDate, saveAtmMeroxBulk } from '../api/atmMerox';
 import { fetchCompresseurK244ByDate, saveCompresseurK244Bulk } from '../api/compresseurK244';
 import { fetchCompresseurK245ByDate, saveCompresseurK245Bulk } from '../api/compresseurK245';
+import {
+  createInitialMouvementBacsData,
+  type HourRow as MouvementBacsHourRow,
+} from '../data/mouvementDesBacs';
+import { fetchMouvementBacsByDate, saveMouvementBacsBulk } from '../api/mouvementDesBacs';
+import {
+  createInitialAnalysesData,
+  products as ANALYSES_PRODUCTS,
+  type AnalyseRow,
+  type HourKey as AnalysesHourKey,
+} from '../data/analysesLaboratoire';
+import { fetchAnalysesByDate, saveAnalysesBulk } from '../api/analysesLaboratoire';
 
 const HOUR_LABELS: Record<string, string> = {
   h7: '7h',
@@ -44,6 +56,12 @@ const HOUR_LABELS: Record<string, string> = {
   h19: '19h',
   h23: '23h',
   h3: '3h',
+  '8h': '8h',
+  '12h': '12h',
+  '16h': '16h',
+  '20h': '20h',
+  '00h': '00h',
+  '04h': '04h',
 };
 
 /** Pour l’affichage : "15.0" → "15", "15.2" → "15.2" (sans .0 inutile). */
@@ -71,6 +89,7 @@ const LABELS_K244: Record<string, string> = {
   eau: 'Eau',
   hydrogene: 'Hydrogène',
   azote: 'Azote',
+  air: 'Air',
   'moteur k244': 'Moteur K244',
 };
 
@@ -94,13 +113,16 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
   disableAutoFocus = false,
   hideSeparator = false,
 }) => {
+  const { getFeuilleTitle, getCategoryLabel, getFieldLabel } = useRenommage();
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [internalDate, setInternalDate] = useState(today);
   const date = externalDate ?? internalDate;
   const setDate = (d: string) => { if (!externalDate) setInternalDate(d); };
   const [internalHour, setInternalHour] = useState(() => getCurrentHourSlot(feuille.hours));
-  const hour = externalHour ?? internalHour;
-  const setHour = (h: string) => { if (!externalHour) setInternalHour(h); };
+  /** Si l'heure externe n'est pas dans les heures disponibles de cette feuille, on l'ignore. */
+  const resolvedExternalHour = externalHour && feuille.hours.includes(externalHour) ? externalHour : undefined;
+  const hour = resolvedExternalHour ?? internalHour;
+  const setHour = (h: string) => { if (!resolvedExternalHour) setInternalHour(h); };
   const [values, setValues] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -127,21 +149,12 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
   const [compresseurK245Rows, setCompresseurK245Rows] = useState<CompresseurK245HourRow[] | null>(null);
   const [loadingCompresseurK245, setLoadingCompresseurK245] = useState(false);
   const [errorCompresseurK245, setErrorCompresseurK245] = useState<string | null>(null);
-
-  /** Mapping clé formulaire (relevé_*) → API Compresseur K245 (consommation_* / cotes_* / azote_*). */
-  const compresseurK245FormKeyToApi: Record<string, string> = useMemo(
-    () => ({
-      'relevé_n° cadre': 'azote_n° cadre',
-      'relevé_p cadre': 'azote_p cadre',
-      'relevé_consom go d202': 'consommation_consom go d202',
-      'relevé_consom go d314b': 'consommation_consom go d314b',
-      'relevé_consom fo d349': 'consommation_consom fo d349',
-      'relevé_consom fo d362': 'consommation_consom fo d362',
-      'relevé_consom eb th': 'consommation_consom eb th',
-      'relevé_cote d 202': 'cotes_cote d 202',
-    }),
-    [],
-  );
+  const [mouvementBacsRows, setMouvementBacsRows] = useState<MouvementBacsHourRow[] | null>(null);
+  const [loadingMouvementBacs, setLoadingMouvementBacs] = useState(false);
+  const [errorMouvementBacs, setErrorMouvementBacs] = useState<string | null>(null);
+  const [analysesRows, setAnalysesRows] = useState<AnalyseRow[] | null>(null);
+  const [loadingAnalyses, setLoadingAnalyses] = useState(false);
+  const [errorAnalyses, setErrorAnalyses] = useState<string | null>(null);
 
   /** Mapping heure formulaire (h7) → API ATM Merox (7h). */
   const atmMeroxFormHourToApi: Record<string, string> = useMemo(
@@ -166,6 +179,8 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
   const isCompresseurK245 = feuille.id === 'compresseur-k245';
   const isProductionValeurElectricite = feuille.id === 'production-valeur-electricite';
   const isAtmMeroxPreflash = feuille.id === 'atm-merox-preflash';
+  const isMouvementDesBacs = feuille.id === 'mouvement-des-bacs';
+  const isAnalysesLaboratoire = feuille.id === 'analyses-laboratoire';
   const hourIndex = feuille.hours.indexOf(hour);
   const previousHour =
     hourIndex > 0 ? feuille.hours[hourIndex - 1] : feuille.hours[feuille.hours.length - 1];
@@ -400,9 +415,63 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
     };
   }, [date, isCompresseurK245]);
 
+  // Chargement des valeurs depuis le backend pour Mouvement des bacs
+  useEffect(() => {
+    if (!isMouvementDesBacs) return;
+    let cancelled = false;
+    setLoadingMouvementBacs(true);
+    setErrorMouvementBacs(null);
+    fetchMouvementBacsByDate(date)
+      .then((rows) => {
+        if (cancelled) return;
+        const base = createInitialMouvementBacsData();
+        if (rows && rows.length > 0) {
+          rows.forEach((row) => {
+            const idx = base.findIndex((r) => r.hour === row.hour);
+            if (idx >= 0) base[idx] = { hour: row.hour, values: row.values };
+          });
+        }
+        setMouvementBacsRows(base);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setErrorMouvementBacs(err instanceof Error ? err.message : 'Erreur lors du chargement');
+        setMouvementBacsRows(createInitialMouvementBacsData());
+      })
+      .finally(() => { if (!cancelled) setLoadingMouvementBacs(false); });
+    return () => { cancelled = true; };
+  }, [date, isMouvementDesBacs]);
+
+  // Chargement des valeurs depuis le backend pour Analyses laboratoire
+  useEffect(() => {
+    if (!isAnalysesLaboratoire) return;
+    let cancelled = false;
+    setLoadingAnalyses(true);
+    setErrorAnalyses(null);
+    fetchAnalysesByDate(date)
+      .then((rows) => {
+        if (cancelled) return;
+        const base = createInitialAnalysesData();
+        if (rows && rows.length > 0) {
+          rows.forEach((row) => {
+            const idx = base.findIndex((r) => r.property === row.property);
+            if (idx >= 0) base[idx] = row;
+          });
+        }
+        setAnalysesRows(base);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setErrorAnalyses(err instanceof Error ? err.message : 'Erreur lors du chargement');
+        setAnalysesRows(createInitialAnalysesData());
+      })
+      .finally(() => { if (!cancelled) setLoadingAnalyses(false); });
+    return () => { cancelled = true; };
+  }, [date, isAnalysesLaboratoire]);
+
   // Pour les autres feuilles : chargement depuis le stockage local
   useEffect(() => {
-    if (isReformateurCatalytique || isProductionValeurElectricite || isGaz || isAtmMeroxPreflash || isCompresseurK244 || isCompresseurK245) {
+    if (isReformateurCatalytique || isProductionValeurElectricite || isGaz || isAtmMeroxPreflash || isCompresseurK244 || isCompresseurK245 || isMouvementDesBacs || isAnalysesLaboratoire) {
       return;
     }
     const stored = loadSaisieFromStorage(feuille.id, date, hour);
@@ -501,27 +570,36 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
     }
   }, [isAtmMeroxPreflash, atmMeroxRows, hour, atmMeroxFormHourToApi]);
 
-  // Synchroniser les valeurs affichées avec la ligne correspondante pour Compresseur K245 (mapping clés formulaire → API)
+  // Synchroniser les valeurs affichées avec la ligne correspondante pour Compresseur K245
   useEffect(() => {
-    if (!isCompresseurK245) {
-      return;
-    }
-    if (!compresseurK245Rows) {
-      setValues({});
-      return;
-    }
+    if (!isCompresseurK245) return;
+    if (!compresseurK245Rows) { setValues({}); return; }
     const rowForHour = compresseurK245Rows.find((r) => r.hour === hour);
-    if (rowForHour) {
-      const next: Record<string, string> = {};
-      Object.keys(compresseurK245FormKeyToApi).forEach((formKey) => {
-        const apiKey = compresseurK245FormKeyToApi[formKey];
-        next[formKey] = rowForHour.values[apiKey] ?? '';
+    setValues(rowForHour ? (rowForHour.values ?? {}) : {});
+  }, [isCompresseurK245, compresseurK245Rows, hour]);
+
+  // Synchroniser les valeurs affichées avec la ligne correspondante pour Mouvement des bacs
+  useEffect(() => {
+    if (!isMouvementDesBacs) return;
+    if (!mouvementBacsRows) { setValues({}); return; }
+    const rowForHour = mouvementBacsRows.find((r) => r.hour === hour);
+    setValues(rowForHour ? (rowForHour.values ?? {}) : {});
+  }, [isMouvementDesBacs, mouvementBacsRows, hour]);
+
+  // Synchroniser les valeurs affichées avec la ligne correspondante pour Analyses laboratoire
+  useEffect(() => {
+    if (!isAnalysesLaboratoire) return;
+    if (!analysesRows) { setValues({}); return; }
+    const next: Record<string, string> = {};
+    analysesRows.forEach((row) => {
+      ANALYSES_PRODUCTS.forEach((productKey) => {
+        const fieldKey = `${row.property}||${productKey}`;
+        const productHours = row[productKey] as { h7: string; h15: string; h23: string };
+        next[fieldKey] = (productHours[hour as AnalysesHourKey] ?? '');
       });
-      setValues(next);
-    } else {
-      setValues({});
-    }
-  }, [isCompresseurK245, compresseurK245Rows, hour, compresseurK245FormKeyToApi]);
+    });
+    setValues(next);
+  }, [isAnalysesLaboratoire, analysesRows, hour]);
 
   // Réinitialiser l'état "modifié" quand on change de date ou de créneau
   useEffect(() => {
@@ -649,11 +727,29 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
         });
       return;
     }
+    if (isMouvementDesBacs) {
+      if (!mouvementBacsRows) return;
+      setSavingBackend(true);
+      saveMouvementBacsBulk(date, mouvementBacsRows)
+        .then(() => { setSaved(true); setIsDirty(false); setTimeout(() => setSaved(false), 2200); })
+        .catch(() => setSaved(false))
+        .finally(() => setSavingBackend(false));
+      return;
+    }
+    if (isAnalysesLaboratoire) {
+      if (!analysesRows) return;
+      setSavingBackend(true);
+      saveAnalysesBulk(date, analysesRows)
+        .then(() => { setSaved(true); setIsDirty(false); setTimeout(() => setSaved(false), 2200); })
+        .catch(() => setSaved(false))
+        .finally(() => setSavingBackend(false));
+      return;
+    }
     saveSaisieToStorage(feuille.id, date, hour, values);
     setSaved(true);
     setIsDirty(false);
     setTimeout(() => setSaved(false), 2200);
-  }, [date, hour, isReformateurCatalytique, isCompresseurK244, isProductionValeurElectricite, isGaz, isAtmMeroxPreflash, isCompresseurK245, feuille.id, reformateurRows, compresseurK244Rows, productionRows, gazRows, atmMeroxRows, compresseurK245Rows, values]);
+  }, [date, hour, isReformateurCatalytique, isCompresseurK244, isProductionValeurElectricite, isGaz, isAtmMeroxPreflash, isCompresseurK245, isMouvementDesBacs, isAnalysesLaboratoire, feuille.id, reformateurRows, compresseurK244Rows, productionRows, gazRows, atmMeroxRows, compresseurK245Rows, mouvementBacsRows, analysesRows, values]);
 
   const handleChange = (key: string, value: string) => {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -745,17 +841,35 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
       }
     }
     if (isCompresseurK245) {
-      const apiKey = compresseurK245FormKeyToApi[key];
-      if (apiKey != null) {
-        setCompresseurK245Rows((prev) => {
+      setCompresseurK245Rows((prev) => {
+        if (!prev) return prev;
+        return prev.map((row) =>
+          row.hour === hour ? { ...row, values: { ...row.values, [key]: value } } : row,
+        );
+      });
+    }
+    if (isMouvementDesBacs) {
+      setMouvementBacsRows((prev) => {
+        if (!prev) return prev;
+        return prev.map((row) =>
+          row.hour === hour ? { ...row, values: { ...row.values, [key]: value } } : row,
+        );
+      });
+    }
+    if (isAnalysesLaboratoire) {
+      const sepIdx = key.indexOf('||');
+      if (sepIdx !== -1) {
+        const property = key.slice(0, sepIdx);
+        const productKey = key.slice(sepIdx + 2);
+        setAnalysesRows((prev) => {
           if (!prev) return prev;
           return prev.map((row) =>
-            row.hour === hour
+            row.property === property
               ? {
                   ...row,
-                  values: {
-                    ...row.values,
-                    [apiKey]: value,
+                  [productKey]: {
+                    ...(row[productKey as keyof AnalyseRow] as object),
+                    [hour]: value,
                   },
                 }
               : row,
@@ -814,12 +928,7 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
       ? LABELS_K244[selectedCategory]
       : selectedCategory || 'Divers';
 
-  const pageTitle =
-    feuille.id === 'compresseur-k244'
-      ? 'Compresseur K244'
-      : feuille.id === 'compresseur-k245'
-        ? 'Compresseur K245'
-        : feuille.title;
+  const pageTitle = getFeuilleTitle(feuille.id);
 
   /* Même style que Tableaux / Graphiques : boutons filtres */
   const filterControlClass =
@@ -860,7 +969,7 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
                   />
                 </>
               )}
-              {!externalHour && (
+              {!resolvedExternalHour && (
                 <div className={`${filterControlClass} gap-0.5 pr-1 pl-2`} role="group" aria-label="Créneau">
                   <button
                     type="button"
@@ -897,8 +1006,10 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
             <div className="mb-4 flex flex-wrap gap-2">
               {orderedCategories.map((cat) => {
                 const isSelected = selectedCategory === cat;
-                const label =
-                  isCompresseurK244 && LABELS_K244[cat] ? LABELS_K244[cat] : cat || 'Divers';
+                const label = getCategoryLabel(
+                  feuille.id,
+                  (isCompresseurK244 || isCompresseurK245) && LABELS_K244[cat] ? LABELS_K244[cat] : cat || 'Divers',
+                );
                 return (
                   <button
                     key={cat || 'Divers'}
@@ -917,13 +1028,14 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
             </div>
           )}
 
-          {!isCompresseurK244 && !isReformateurCatalytique && !isGaz && !isCompresseurK245 && !isProductionValeurElectricite && !isAtmMeroxPreflash && (
+          {!isCompresseurK244 && !isReformateurCatalytique && !isGaz && !isCompresseurK245 && !isProductionValeurElectricite && !isAtmMeroxPreflash && !isMouvementDesBacs && !isAnalysesLaboratoire && (
             <p className="mb-4 text-base font-semibold text-body dark:text-bodydark1">
               {categoryLabel}
             </p>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-            {fieldsForSelectedCategory.map(({ label, key }, idx) => {
+            {fieldsForSelectedCategory.map(({ label: defaultLabel, key }, idx) => {
+              const label = getFieldLabel(feuille.id, key, defaultLabel);
               const rawValue = values[key] ?? '';
               const isFocused = focusedFieldKey === key;
               /** Au focus : afficher la valeur formatée ("56" pas "56.0"), sauf si l’utilisateur tape une décimale (ex. "14."). */

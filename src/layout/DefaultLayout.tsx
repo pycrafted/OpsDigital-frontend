@@ -9,7 +9,7 @@ import { useTableauxFilter } from '../context/TableauxFilterContext';
 
 const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { pathname, search } = useLocation();
-  const { hideEmptyColumns, toggleHideEmptyColumns } = useTableView();
+  const { hideEmptyColumns, toggleHideEmptyColumns, canEdit, toggleCanEdit } = useTableView();
   const { date, setDate, hour, setHour, today } = useSaisieFilter();
   const hourIndex = ALL_HOURS.indexOf(hour);
   const previousHour = ALL_HOURS[hourIndex > 0 ? hourIndex - 1 : ALL_HOURS.length - 1];
@@ -34,7 +34,16 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
   const isSaisieTousPage = pathname === '/saisie/tous';
   const isGraphiquesPage = pathname.startsWith('/graphique');
   const isTableauxPage = pathname === '/tableaux' || pathname.startsWith('/tableaux/');
-  const isSettingsPage = pathname === '/settings' || pathname.startsWith('/settings');
+  const isParametragePage = pathname === '/parametrage';
+
+  const PARAMETRAGE_SECTIONS = [
+    { id: 'visibilite-saisie', label: 'Visibilité Saisie' },
+    { id: 'mode-affichage', label: "Mode d'affichage" },
+    { id: 'renommage', label: 'Renommage' },
+    { id: 'tags-ip21', label: 'Tags IP21' },
+  ] as const;
+
+  const parametrageSection = new URLSearchParams(search).get('section') ?? 'visibilite-saisie';
 
   const SAISIE_IDS: string[] = [];
 
@@ -75,7 +84,6 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
   const tableauSearch = new URLSearchParams(search).get('tableau');
   const isShowAllTablesPage = isTableauxPage && tableauSearch === 'Tout';
   const isShowAllGraphsPage = pathname === '/graphique/tous';
-  const settingsTableauSearch = isSettingsPage ? new URLSearchParams(search).get('tableau') : null;
 
   return (
     <div className="bg-[#f0f9ff] dark:bg-[#1a222c] dark:text-bodydark">
@@ -189,18 +197,219 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
           </div>
         )}
 
-        {/* <!-- ===== Filtre date (tableaux/tous) ===== --> */}
-        {isShowAllTablesPage && (
+        {/* <!-- ===== Navbar secondaire Tableaux ===== --> */}
+        {isTableauxPage && (
+          <div className="z-40 shrink-0 border-b border-stroke bg-[#f0f9ff] dark:border-strokedark dark:bg-[#23303e]">
+            <div className="mx-auto grid w-full max-w-screen-2xl grid-cols-3 items-center gap-2 px-4 py-2 md:px-6 2xl:px-11">
+              <div />
+              {/* Centre : menu + navigateur + oeil (non-Tout) ou date + oeil (Tout) */}
+              <div className="flex justify-center">
+                {!isShowAllTablesPage ? (() => {
+                  const activeLabel = tableauSearch && tableauOptionsOrdered.some(o => o.label === tableauSearch)
+                    ? tableauSearch
+                    : 'Analyses du laboratoire';
+                  const activeIdx = tableauOptionsOrdered.findIndex(o => o.label === activeLabel);
+                  const prevOpt = tableauOptionsOrdered[activeIdx > 0 ? activeIdx - 1 : tableauOptionsOrdered.length - 1];
+                  const nextOpt = tableauOptionsOrdered[activeIdx < tableauOptionsOrdered.length - 1 ? activeIdx + 1 : 0];
+                  return (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={toggleHideEmptyColumns}
+                        className={`flex shrink-0 items-center justify-center rounded border px-2 py-1 shadow transition ${
+                          hideEmptyColumns
+                            ? 'border-primary bg-primary text-white hover:bg-primary/90'
+                            : 'border-primary bg-white text-primary dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white hover:bg-primary/10 dark:hover:bg-white/10'
+                        }`}
+                        aria-label={hideEmptyColumns ? 'Afficher toutes les colonnes' : 'Masquer les colonnes vides'}
+                        title={hideEmptyColumns ? 'Afficher toutes les colonnes' : 'Masquer les colonnes sans données'}
+                      >
+                        {hideEmptyColumns ? (
+                          <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" strokeWidth={2} />
+                          </svg>
+                        ) : (
+                          <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                            <line x1="1" y1="1" x2="23" y2="23" strokeLinecap="round" strokeWidth={2} />
+                          </svg>
+                        )}
+                      </button>
+                      <div
+                        className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]"
+                        role="group"
+                        aria-label="Tableau"
+                      >
+                        <Link
+                          to={`/tableaux?tableau=${encodeURIComponent(prevOpt.label)}`}
+                          className="rounded-l px-2 py-0.5 text-primary hover:bg-black/5 dark:text-white dark:hover:bg-white/10"
+                          title={prevOpt.label}
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                          </svg>
+                        </Link>
+                        <span className="min-w-[11rem] py-0.5 text-center text-xs font-bold text-primary dark:text-white">
+                          {activeLabel}
+                        </span>
+                        <Link
+                          to={`/tableaux?tableau=${encodeURIComponent(nextOpt.label)}`}
+                          className="rounded-r px-2 py-0.5 text-primary hover:bg-black/5 dark:text-white dark:hover:bg-white/10"
+                          title={nextOpt.label}
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </Link>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={toggleCanEdit}
+                        className={`flex shrink-0 items-center justify-center rounded border px-2 py-1 shadow transition ${
+                          canEdit
+                            ? 'border-primary bg-primary text-white hover:bg-primary/90'
+                            : 'border-primary bg-white text-primary dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white hover:bg-primary/10 dark:hover:bg-white/10'
+                        }`}
+                        aria-label={canEdit ? 'Verrouiller' : 'Déverrouiller'}
+                        title={canEdit ? 'Verrouiller la modification' : 'Autoriser la modification'}
+                      >
+                        {canEdit ? (
+                          <svg className="h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+                            <path fillRule="evenodd" d="M14.5 1A4.5 4.5 0 0010 5.5V9H3a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-1V5.5A4.5 4.5 0 0014.5 1zM12 9V5.5a2 2 0 10-4 0V9h4z" clipRule="evenodd" />
+                          </svg>
+                        ) : (
+                          <svg className="h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+                            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })() : (
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
+                      <input
+                        type="date"
+                        value={tableauxDate}
+                        max={tableauxToday}
+                        onChange={(e) => setTableauxDate(e.target.value)}
+                        className="w-[7.5rem] rounded border-0 bg-transparent py-0.5 text-xs font-bold text-primary outline-none dark:text-white"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleHideEmptyColumns}
+                      className={`flex shrink-0 items-center justify-center rounded border px-2 py-1 shadow transition ${
+                        hideEmptyColumns
+                          ? 'border-primary bg-primary text-white hover:bg-primary/90'
+                          : 'border-primary bg-white text-primary dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white hover:bg-primary/10 dark:hover:bg-white/10'
+                      }`}
+                      aria-label={hideEmptyColumns ? 'Afficher toutes les colonnes' : 'Masquer les colonnes vides'}
+                      title={hideEmptyColumns ? 'Afficher toutes les colonnes' : 'Masquer les colonnes sans données'}
+                    >
+                      {hideEmptyColumns ? (
+                        <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" strokeWidth={2} />
+                        </svg>
+                      ) : (
+                        <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                          <line x1="1" y1="1" x2="23" y2="23" strokeLinecap="round" strokeWidth={2} />
+                        </svg>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={toggleCanEdit}
+                      className={`flex shrink-0 items-center justify-center rounded border px-2 py-1 shadow transition ${
+                        canEdit
+                          ? 'border-primary bg-primary text-white hover:bg-primary/90'
+                          : 'border-primary bg-white text-primary dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white hover:bg-primary/10 dark:hover:bg-white/10'
+                      }`}
+                      aria-label={canEdit ? 'Verrouiller' : 'Déverrouiller'}
+                      title={canEdit ? 'Verrouiller la modification' : 'Autoriser la modification'}
+                    >
+                      {canEdit ? (
+                        <svg className="h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+                          <path fillRule="evenodd" d="M14.5 1A4.5 4.5 0 0010 5.5V9H3a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-1V5.5A4.5 4.5 0 0014.5 1zM12 9V5.5a2 2 0 10-4 0V9h4z" clipRule="evenodd" />
+                        </svg>
+                      ) : (
+                        <svg className="h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+                          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div />
+            </div>
+          </div>
+        )}
+
+        {/* <!-- ===== Navbar secondaire Graphiques ===== --> */}
+        {isGraphiquesPage && !isShowAllGraphsPage && (
+          <div className="z-40 shrink-0 border-b border-stroke bg-[#f0f9ff] dark:border-strokedark dark:bg-[#23303e]">
+            <div className="mx-auto grid w-full max-w-screen-2xl grid-cols-3 items-center gap-2 px-4 py-2 md:px-6 2xl:px-11">
+              <div />
+              <div className="flex justify-center">
+                {(() => {
+                  const activeRoute = graphiqueRoutesOrdered.find(r => r.path === pathname) ?? graphiqueRoutesOrdered[0];
+                  const activeIdx = graphiqueRoutesOrdered.indexOf(activeRoute);
+                  const prevRoute = graphiqueRoutesOrdered[activeIdx > 0 ? activeIdx - 1 : graphiqueRoutesOrdered.length - 1];
+                  const nextRoute = graphiqueRoutesOrdered[activeIdx < graphiqueRoutesOrdered.length - 1 ? activeIdx + 1 : 0];
+                  return (
+                    <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]" role="group" aria-label="Graphique">
+                      <Link
+                        to={prevRoute.path}
+                        className="rounded-l px-2 py-0.5 text-primary hover:bg-black/5 dark:text-white dark:hover:bg-white/10"
+                        title={prevRoute.label}
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </Link>
+                      <span className="min-w-[11rem] py-0.5 text-center text-xs font-bold text-primary dark:text-white">
+                        {activeRoute.label}
+                      </span>
+                      <Link
+                        to={nextRoute.path}
+                        className="rounded-r px-2 py-0.5 text-primary hover:bg-black/5 dark:text-white dark:hover:bg-white/10"
+                        title={nextRoute.label}
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </Link>
+                    </div>
+                  );
+                })()}
+              </div>
+              <div />
+            </div>
+          </div>
+        )}
+
+        {/* <!-- ===== Navbar secondaire Paramétrage ===== --> */}
+        {isParametragePage && (
           <div className="z-40 shrink-0 border-b border-stroke bg-[#f0f9ff] dark:border-strokedark dark:bg-[#23303e]">
             <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-center px-4 py-2 md:px-6 2xl:px-11">
-              <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                <input
-                  type="date"
-                  value={tableauxDate}
-                  max={tableauxToday}
-                  onChange={(e) => setTableauxDate(e.target.value)}
-                  className="w-[7.5rem] rounded border-0 bg-transparent py-0.5 text-xs font-bold text-primary outline-none dark:text-white"
-                />
+              <div className="flex items-center gap-2">
+                {PARAMETRAGE_SECTIONS.map((section) => (
+                  <Link
+                    key={section.id}
+                    to={`/parametrage?section=${section.id}`}
+                    className={`rounded border px-3 py-1 text-xs font-bold shadow transition ${
+                      parametrageSection === section.id
+                        ? 'border-primary bg-primary text-white hover:bg-primary/90'
+                        : 'border-primary bg-white text-primary dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white hover:bg-primary/10 dark:hover:bg-white/10'
+                    }`}
+                  >
+                    {section.label}
+                  </Link>
+                ))}
               </div>
             </div>
           </div>
@@ -236,9 +445,9 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
         {/* <!-- ===== Content Area End ===== --> */}
 
         {/* ===== Footer Start ===== */}
-        <footer className="shrink-0 border-t border-stroke bg-[#f0f9ff] px-4 py-3 dark:border-strokedark dark:bg-[#1a222c]">
+        {!isSaisieTousPage && !isTableauxPage && !isShowAllGraphsPage && !isGraphiquesPage && <footer className="shrink-0 border-t border-stroke bg-[#f0f9ff] px-4 py-3 dark:border-strokedark dark:bg-[#1a222c]">
           <div className="mx-auto flex max-w-screen-2xl w-full flex-row flex-wrap items-center justify-center gap-2 md:justify-between">
-            {(isTableauxPage || isGraphiquesPage || isSaisiePage) && (
+            {(isGraphiquesPage || isSaisiePage) && (
               <div className="flex items-center gap-1 md:order-first">
                 {isSaisiePage && !isSaisieTousPage && (
                   <Link
@@ -250,22 +459,6 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
                     }`}
                     aria-label="Afficher toutes les feuilles de saisie"
                     title="Afficher toutes les feuilles de saisie"
-                  >
-                    <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                    </svg>
-                  </Link>
-                )}
-                {(isTableauxPage || isSaisieTousPage) && (
-                  <Link
-                    to="/tableaux?tableau=Tout"
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition ${
-                      tableauSearch === 'Tout'
-                        ? 'bg-primary text-white hover:bg-primary/90'
-                        : 'text-primary dark:text-bodydark hover:bg-stroke dark:hover:bg-meta-4/50 dark:hover:text-white'
-                    }`}
-                    aria-label="Afficher tous les tableaux"
-                    title="Afficher tous les tableaux"
                   >
                     <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
@@ -290,7 +483,7 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
                 )}
               </div>
             )}
-            <div className={`flex flex-wrap items-center gap-2 justify-center ${isSaisiePage || isGraphiquesPage || isTableauxPage || isSettingsPage ? 'md:flex-1' : ''}`}>
+            <div className={`flex flex-wrap items-center gap-2 justify-center ${isSaisiePage || isGraphiquesPage ? 'md:flex-1' : ''}`}>
             {isSaisiePage && !isSaisieTousPage && (
               <div className="inline-flex items-center rounded-md bg-whiter p-1 dark:bg-meta-4">
                 {saisieFeuillesOrdered.map((feuille) => {
@@ -311,31 +504,6 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
                 })}
               </div>
             )}
-
-            {(isTableauxPage || isSaisieTousPage) && (
-              <div className="inline-flex items-center rounded-md bg-whiter p-1 dark:bg-meta-4">
-                {tableauOptionsOrdered.map((opt) => {
-                  const isActive =
-                    tableauSearch === opt.label ||
-                    (!tableauSearch && !isSaisieTousPage && opt.label === 'Analyses du laboratoire');
-                  const to = `/tableaux?tableau=${encodeURIComponent(opt.label)}`;
-                  return (
-                    <Link
-                      key={opt.label}
-                      to={to}
-                      className={`rounded py-1 px-3 text-xs font-medium text-[#3c50e0] dark:text-white ${
-                        isActive
-                          ? 'bg-white shadow-card hover:bg-white hover:shadow-card dark:bg-boxdark dark:hover:bg-boxdark'
-                          : 'hover:bg-white hover:shadow-card dark:hover:bg-boxdark'
-                      }`}
-                    >
-                      {opt.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-
             {isGraphiquesPage && (
               <div className="inline-flex items-center rounded-md bg-whiter p-1 dark:bg-meta-4">
                 {graphiqueRoutesOrdered.map((item) => {
@@ -356,60 +524,9 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
                 })}
               </div>
             )}
-
-            {isSettingsPage && (
-              <div className="inline-flex items-center rounded-md bg-whiter p-1 dark:bg-meta-4">
-                {tableauOptionsOrdered.map((opt) => {
-                  const isActive =
-                    settingsTableauSearch === opt.label ||
-                    (!settingsTableauSearch && opt.label === 'Analyses du laboratoire');
-                  const to = `/settings?tableau=${encodeURIComponent(opt.label)}`;
-                  return (
-                    <Link
-                      key={opt.label}
-                      to={to}
-                      className={`rounded py-1 px-3 text-xs font-medium text-[#3c50e0] dark:text-white ${
-                        isActive
-                          ? 'bg-white shadow-card hover:bg-white hover:shadow-card dark:bg-boxdark dark:hover:bg-boxdark'
-                          : 'hover:bg-white hover:shadow-card dark:hover:bg-boxdark'
-                      }`}
-                    >
-                      {opt.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
             </div>
-            {isTableauxPage && (
-              <div className="flex items-center gap-1 md:order-last">
-                <button
-                  type="button"
-                  onClick={toggleHideEmptyColumns}
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition ${
-                    hideEmptyColumns
-                      ? 'bg-primary text-white hover:bg-primary/90'
-                      : 'text-primary dark:text-bodydark hover:bg-stroke dark:hover:bg-meta-4/50 dark:hover:text-white'
-                  }`}
-                  aria-label={hideEmptyColumns ? 'Afficher toutes les colonnes' : 'Masquer les colonnes vides'}
-                  title={hideEmptyColumns ? 'Afficher toutes les colonnes' : 'Masquer les colonnes sans données'}
-                >
-                  {hideEmptyColumns ? (
-                    <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                      <circle cx="12" cy="12" r="3" strokeWidth={2} />
-                    </svg>
-                  ) : (
-                    <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                      <line x1="1" y1="1" x2="23" y2="23" strokeLinecap="round" strokeWidth={2} />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            )}
           </div>
-        </footer>
+        </footer>}
         {/* ===== Footer End ===== */}
       </div>
       {/* <!-- ===== Page Wrapper End ===== --> */}

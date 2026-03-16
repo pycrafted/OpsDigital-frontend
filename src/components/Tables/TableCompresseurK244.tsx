@@ -23,17 +23,6 @@ const CHECK = (
   </svg>
 );
 
-const LOCK_CLOSED = (
-  <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
-    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-  </svg>
-);
-
-const LOCK_OPEN = (
-  <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
-    <path fillRule="evenodd" d="M14.5 1A4.5 4.5 0 0010 5.5V9H3a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-1V5.5A4.5 4.5 0 0014.5 1zM12 9V5.5a2 2 0 10-4 0V9h4z" clipRule="evenodd" />
-  </svg>
-);
 
 
 /** Pour l’affichage : "15.0" → "15", "15.2" → "15.2" (sans .0 inutile). */
@@ -73,11 +62,10 @@ const TableCompresseurK244 = ({
 }: TableCompresseurK244Props) => {
   const { getHourLabel, getCategoryLabel, getMeasureLabel } = useCompresseurK244Labels();
   const { isOutOfBounds } = useCompresseurK244Bounds();
-  const { hideEmptyColumns } = useTableView();
+  const { hideEmptyColumns, canEdit } = useTableView();
   const [selectedHours, setSelectedHours] = React.useState<string[]>(hours.map((h) => h));
   const [selectedCategories, setSelectedCategories] = React.useState<string[]>(categories.map(c => c.category));
   const [selectedSubRows, setSelectedSubRows] = React.useState<string[]>([...allSubRowNames]);
-  const [canEdit, setCanEdit] = React.useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = React.useState(false);
   const [showHourDropdown, setShowHourDropdown] = React.useState(false);
   const [showSubRowDropdown, setShowSubRowDropdown] = React.useState(false);
@@ -364,16 +352,6 @@ const TableCompresseurK244 = ({
               ) : (
                 'Enregistrer'
               )}
-            </button>
-          )}
-          {!isEmptyState && (
-            <button
-              type="button"
-              onClick={() => setCanEdit((prev) => !prev)}
-              className="flex shrink-0 items-center justify-center rounded border border-primary bg-white px-2 py-1 text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white"
-              aria-label="Modification directe"
-            >
-              {canEdit ? LOCK_OPEN : LOCK_CLOSED}
             </button>
           )}
         </div>

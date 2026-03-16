@@ -8,11 +8,11 @@ import SignUp from './pages/Authentication/SignUp';
 import Login from './pages/Authentication/Login';
 import Calendar from './pages/Calendar';
 import ECommerce from './pages/Dashboard/ECommerce';
-import Settings from './pages/Settings';
 import AnalysesLaboratoire from './pages/AnalysesLaboratoire';
 import AnalysesLaboratoireGraphique from './pages/AnalysesLaboratoireGraphique';
 import SaisieFeuillePage from './pages/SaisieFeuillePage';
 import SaisieTousPage from './pages/SaisieTousPage';
+import ParametragePage from './pages/ParametragePage';
 import Profile from './pages/Profile';
 import DefaultLayout from './layout/DefaultLayout';
 import { AnalysesLaboLabelsProvider } from './context/AnalysesLaboLabelsContext';
@@ -35,6 +35,9 @@ import { TableViewProvider } from './context/TableViewContext';
 import { SaisieFilterProvider } from './context/SaisieFilterContext';
 import { GraphiqueFilterProvider } from './context/GraphiqueFilterContext';
 import { TableauxFilterProvider } from './context/TableauxFilterContext';
+import { SaisieVisibilityProvider } from './context/SaisieVisibilityContext';
+import { DisplayModeProvider } from './context/DisplayModeContext';
+import { RenommageProvider } from './context/RenommageContext';
 
 function App() {
   const [loading, setLoading] = useState<boolean>(true);
@@ -99,6 +102,9 @@ function App() {
           <ProductionBoundsProvider>
           <ReformateurLabelsProvider>
           <ReformateurBoundsProvider>
+          <RenommageProvider>
+          <DisplayModeProvider>
+          <SaisieVisibilityProvider>
           <TableViewProvider>
           <SaisieFilterProvider>
           <GraphiqueFilterProvider>
@@ -230,13 +236,8 @@ function App() {
           }
         />
         <Route
-          path="/settings"
-          element={
-            <>
-              <PageTitle />
-              <Settings />
-            </>
-          }
+          path="/parametrage"
+          element={<ParametragePage />}
         />
       </Routes>
           </DefaultLayout>
@@ -244,6 +245,9 @@ function App() {
           </GraphiqueFilterProvider>
           </SaisieFilterProvider>
           </TableViewProvider>
+          </SaisieVisibilityProvider>
+          </DisplayModeProvider>
+          </RenommageProvider>
           </ReformateurBoundsProvider>
           </ReformateurLabelsProvider>
           </ProductionBoundsProvider>
