@@ -1,4 +1,9 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import {
+  fetchTagsIp21Config,
+  bulkUpdateTagsIp21Config,
+  type TagsIp21ConfigItem,
+} from '../api/tagsIp21';
 
 export type FieldSource = 'manual' | 'sap' | 'ip21';
 
@@ -7,54 +12,79 @@ export interface FieldTagConfig {
   ip21Tag: string;
 }
 
+// Structure interne : { feuilleId: { fieldKey: FieldTagConfig } }
 type TagsConfig = Record<string, Record<string, FieldTagConfig>>;
-
-const STORAGE_KEY = 'tags_ip21_config';
-
-const load = (): TagsConfig => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return {};
-};
 
 const DEFAULT_CONFIG: FieldTagConfig = { source: 'manual', ip21Tag: '' };
 
+// ── Conversion API ↔ interne ────────────────────────────────────────────────
+
+function itemsToConfig(items: TagsIp21ConfigItem[]): TagsConfig {
+  const config: TagsConfig = {};
+  for (const item of items) {
+    if (!config[item.feuille_id]) config[item.feuille_id] = {};
+    config[item.feuille_id][item.field_key] = {
+      source: item.source,
+      ip21Tag: item.ip21_tag,
+    };
+  }
+  return config;
+}
+
+// ── Context ─────────────────────────────────────────────────────────────────
+
 interface TagsIp21ContextType {
   config: TagsConfig;
+  loading: boolean;
   getFieldConfig: (feuilleId: string, fieldKey: string) => FieldTagConfig;
   setFieldSource: (feuilleId: string, fieldKey: string, source: FieldSource) => void;
   setFieldTag: (feuilleId: string, fieldKey: string, tag: string) => void;
   getIp21TagsForFeuille: (feuilleId: string) => Record<string, string>;
+  reload: () => Promise<void>;
 }
 
 const TagsIp21Context = createContext<TagsIp21ContextType | null>(null);
 
 export const TagsIp21Provider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [config, setConfig] = useState<TagsConfig>(load);
+  const [config, setConfig] = useState<TagsConfig>({});
+  const [loading, setLoading] = useState(true);
 
-  const save = (next: TagsConfig) => {
-    setConfig(next);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  const loadFromApi = async () => {
+    try {
+      setLoading(true);
+      const items = await fetchTagsIp21Config();
+      setConfig(itemsToConfig(items));
+    } catch (err) {
+      console.error('TagsIp21: impossible de charger la config depuis l\'API', err);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    loadFromApi();
+  }, []);
 
   const getFieldConfig = (feuilleId: string, fieldKey: string): FieldTagConfig =>
     config[feuilleId]?.[fieldKey] ?? DEFAULT_CONFIG;
 
   const setFieldSource = (feuilleId: string, fieldKey: string, source: FieldSource) => {
-    const current = getFieldConfig(feuilleId, fieldKey);
-    save({
-      ...config,
-      [feuilleId]: { ...config[feuilleId], [fieldKey]: { ...current, source } },
+    setConfig(prev => {
+      const current = prev[feuilleId]?.[fieldKey] ?? DEFAULT_CONFIG;
+      const fc = { ...current, source };
+      bulkUpdateTagsIp21Config([{ feuille_id: feuilleId, field_key: fieldKey, source: fc.source, ip21_tag: fc.ip21Tag }])
+        .catch(err => console.error('TagsIp21: échec sauvegarde source', err));
+      return { ...prev, [feuilleId]: { ...prev[feuilleId], [fieldKey]: fc } };
     });
   };
 
   const setFieldTag = (feuilleId: string, fieldKey: string, tag: string) => {
-    const current = getFieldConfig(feuilleId, fieldKey);
-    save({
-      ...config,
-      [feuilleId]: { ...config[feuilleId], [fieldKey]: { ...current, ip21Tag: tag } },
+    setConfig(prev => {
+      const current = prev[feuilleId]?.[fieldKey] ?? DEFAULT_CONFIG;
+      const fc = { ...current, ip21Tag: tag };
+      bulkUpdateTagsIp21Config([{ feuille_id: feuilleId, field_key: fieldKey, source: fc.source, ip21_tag: fc.ip21Tag }])
+        .catch(err => console.error('TagsIp21: échec sauvegarde tag', err));
+      return { ...prev, [feuilleId]: { ...prev[feuilleId], [fieldKey]: fc } };
     });
   };
 
@@ -68,7 +98,15 @@ export const TagsIp21Provider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   return (
     <TagsIp21Context.Provider
-      value={{ config, getFieldConfig, setFieldSource, setFieldTag, getIp21TagsForFeuille }}
+      value={{
+        config,
+        loading,
+        getFieldConfig,
+        setFieldSource,
+        setFieldTag,
+        getIp21TagsForFeuille,
+        reload: loadFromApi,
+      }}
     >
       {children}
     </TagsIp21Context.Provider>

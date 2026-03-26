@@ -7,8 +7,12 @@ import {
   type GazHourKey,
 } from '../../data/gaz';
 import { useGazLabels } from '../../context/GazLabelsContext';
+import { useRenommage } from '../../context/RenommageContext';
 import { useGazBounds } from '../../context/GazBoundsContext';
 import { useTableView } from '../../context/TableViewContext';
+import { fetchTableSettings, saveTableSettings } from '../../api/tableSettings';
+
+const FEUILLE_ID = "gaz";
 
 const CHEVRON_DOWN = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden>
@@ -59,9 +63,79 @@ const TableGaz = ({
   sectionTitle,
   showInlineDate = false,
 }: TableGazProps) => {
-  const { getHourLabel, getColumnTitle, getColumnSubtitle } = useGazLabels();
+  const { getHourLabel, getColumnTitle: _getTitle, getColumnSubtitle } = useGazLabels();
+  const { getFieldLabel } = useRenommage();
+  const getColumnTitle = (key: string) => getFieldLabel('gaz', `gaz_${key}`, _getTitle(key as Parameters<typeof _getTitle>[0]));
   const { isOutOfBounds } = useGazBounds();
   const { hideEmptyColumns, canEdit } = useTableView();
+
+  // --- Drag & drop column order ---
+  type DragState = { key: string } | null;
+  type DropTarget = { key: string; side: "left" | "right" } | null;
+
+  const defaultColOrder = columns.map((c) => c.key);
+  const [columnOrder, setColumnOrder] = React.useState<string[]>(defaultColOrder);
+  const saveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragStateRef = React.useRef<DragState>(null);
+  const [dropTarget, setDropTarget] = React.useState<DropTarget>(null);
+
+  React.useEffect(() => {
+    fetchTableSettings(FEUILLE_ID).then((s) => {
+      if (Array.isArray(s["column_order"])) setColumnOrder(s["column_order"] as string[]);
+      else {
+        try { const v = localStorage.getItem("gaz_column_order"); if (v) setColumnOrder(JSON.parse(v) as string[]); } catch (_) {}
+      }
+    }).catch((_) => {
+      try { const v = localStorage.getItem("gaz_column_order"); if (v) setColumnOrder(JSON.parse(v) as string[]); } catch (_2) {}
+    });
+  }, []);
+
+  function scheduleSave(order: string[]) {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      localStorage.setItem("gaz_column_order", JSON.stringify(order));
+      saveTableSettings(FEUILLE_ID, { column_order: order }).catch((_) => {});
+    }, 800);
+  }
+
+  function getSide(e: React.DragEvent<HTMLTableCellElement>): "left" | "right" {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    return e.clientX < rect.left + rect.width / 2 ? "left" : "right";
+  }
+
+  function handleColDragStart(e: React.DragEvent<HTMLTableCellElement>, key: string) {
+    dragStateRef.current = { key };
+    e.dataTransfer.effectAllowed = "move";
+  }
+  function handleColDragOver(e: React.DragEvent<HTMLTableCellElement>, key: string) {
+    e.preventDefault();
+    if (!dragStateRef.current) return;
+    setDropTarget({ key, side: getSide(e) });
+  }
+  function handleColDrop(e: React.DragEvent<HTMLTableCellElement>, toKey: string) {
+    e.preventDefault();
+    const ds = dragStateRef.current;
+    if (!ds || ds.key === toKey) { setDropTarget(null); return; }
+    const side = getSide(e);
+    const arr = [...columnOrder];
+    const fromIdx = arr.indexOf(ds.key);
+    if (fromIdx === -1) { setDropTarget(null); return; }
+    arr.splice(fromIdx, 1);
+    let toIdx = arr.indexOf(toKey);
+    if (toIdx === -1) { setDropTarget(null); return; }
+    if (side === "right") toIdx += 1;
+    arr.splice(toIdx, 0, ds.key);
+    setColumnOrder(arr);
+    scheduleSave(arr);
+    setDropTarget(null);
+    dragStateRef.current = null;
+  }
+
+  function clearDrag() {
+    dragStateRef.current = null;
+    setDropTarget(null);
+  }
+  // --- end drag & drop ---
 
   const [selectedRows, setSelectedRows] = React.useState<GazHourKey[]>(() => [...rows]);
   const [selectedColumnKeys, setSelectedColumnKeys] = React.useState<GazColumnKey[]>(() => columns.map((c) => c.key));
@@ -99,7 +173,13 @@ const TableGaz = ({
   };
 
   const filteredRows = rows.filter((r) => selectedRows.includes(r));
-  const filteredColumns = columns.filter((c) => selectedColumnKeys.includes(c.key));
+  const filteredColumns = columns
+    .filter((c) => selectedColumnKeys.includes(c.key))
+    .sort((a, b) => {
+      const ai = columnOrder.indexOf(a.key);
+      const bi = columnOrder.indexOf(b.key);
+      return (ai === -1 ? 9999 : ai) - (bi === -1 ? 9999 : bi);
+    });
   const visibleColumns = hideEmptyColumns
     ? filteredColumns.filter((col) =>
         filteredRows.some((rowHour) => {
@@ -307,14 +387,24 @@ const TableGaz = ({
                   className="sticky left-0 z-20 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 border-t-0 border-l-0 bg-[#eff6ff] py-1.5 pl-2 pr-2 dark:border-strokedark dark:border-t-0 dark:border-l-0 dark:bg-[#273342]"
                   aria-label=""
                 />
-                {visibleColumns.map((col) => (
-                  <th
-                    key={col.key}
-                    className="sticky top-0 z-10 min-w-[9rem] border-b border-r border-stroke/70 bg-primary py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark"
-                  >
-                    {getColumnTitle(col.key)}
-                  </th>
-                ))}
+                {visibleColumns.map((col) => {
+                  const isDraggingThis = dragStateRef.current?.key === col.key;
+                  const isDropHere = dropTarget?.key === col.key;
+                  return (
+                    <th
+                      key={col.key}
+                      draggable={canEdit}
+                      onDragStart={(e) => handleColDragStart(e, col.key)}
+                      onDragOver={(e) => handleColDragOver(e, col.key)}
+                      onDrop={(e) => handleColDrop(e, col.key)}
+                      onDragEnd={clearDrag}
+                      onDragLeave={() => setDropTarget(null)}
+                      className={`sticky top-0 z-10 min-w-[9rem] border-b border-r border-stroke/70 py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark select-none transition-colors ${canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${isDraggingThis ? "bg-[#0d1a47]" : "bg-primary"} ${isDropHere && dropTarget?.side === "left" ? "border-l-[3px] border-l-yellow-300" : ""} ${isDropHere && dropTarget?.side === "right" ? "border-r-[3px] border-r-yellow-300" : ""}`}
+                    >
+                      {getColumnTitle(col.key)}
+                    </th>
+                  );
+                })}
               </tr>
               <tr>
                 <th
@@ -323,16 +413,26 @@ const TableGaz = ({
                 >
                   {''}
                 </th>
-                {visibleColumns.map((col) => (
-                  <th
-                    key={col.key}
-                    className="sticky top-7 z-10 min-w-[9rem] border-b border-r border-stroke/70 bg-primary/95 py-1 px-1.5 text-center text-[11px] font-medium text-white/95 dark:border-strokedark"
-                  >
-                    <span className="block truncate" title={getColumnSubtitle(col.key)}>
-                      {getColumnSubtitle(col.key)}
-                    </span>
-                  </th>
-                ))}
+                {visibleColumns.map((col) => {
+                  const isDraggingThis = dragStateRef.current?.key === col.key;
+                  const isDropHere = dropTarget?.key === col.key;
+                  return (
+                    <th
+                      key={col.key}
+                      draggable={canEdit}
+                      onDragStart={(e) => handleColDragStart(e, col.key)}
+                      onDragOver={(e) => handleColDragOver(e, col.key)}
+                      onDrop={(e) => handleColDrop(e, col.key)}
+                      onDragEnd={clearDrag}
+                      onDragLeave={() => setDropTarget(null)}
+                      className={`sticky top-7 z-10 min-w-[9rem] border-b border-r border-stroke/70 py-1 px-1.5 text-center text-[11px] font-medium text-white/95 dark:border-strokedark select-none transition-colors ${canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${isDraggingThis ? "bg-[#0d1a47]" : "bg-primary/95"} ${isDropHere && dropTarget?.side === "left" ? "border-l-[3px] border-l-yellow-300" : ""} ${isDropHere && dropTarget?.side === "right" ? "border-r-[3px] border-r-yellow-300" : ""}`}
+                    >
+                      <span className="block truncate" title={getColumnSubtitle(col.key)}>
+                        {getColumnSubtitle(col.key)}
+                      </span>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>

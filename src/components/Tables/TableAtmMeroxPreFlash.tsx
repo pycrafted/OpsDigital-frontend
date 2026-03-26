@@ -7,9 +7,12 @@ import {
   type HourRow,
 } from '../../data/atmMeroxPreFlash';
 import { useAtmMeroxLabels } from '../../context/AtmMeroxLabelsContext';
+import { useRenommage } from '../../context/RenommageContext';
 import { useAtmMeroxBounds } from '../../context/AtmMeroxBoundsContext';
 import { useTableView } from '../../context/TableViewContext';
+import { fetchTableSettings, saveTableSettings } from '../../api/tableSettings';
 
+const FEUILLE_ID = "atm-merox-preflash";
 const hours = [...ATM_MEROX_HOURS];
 const allCategoryNames = categories.map((c) => c.category);
 const allSubRowNames = [...new Set(categories.flatMap((c) => c.subRows))] as string[];
@@ -63,7 +66,10 @@ const TableAtmMeroxPreFlash = ({
   sectionTitle,
   showInlineDate = false,
 }: TableAtmMeroxPreFlashProps) => {
-  const { getHourLabel, getCategoryLabel, getMeasureLabel } = useAtmMeroxLabels();
+  const { getHourLabel } = useAtmMeroxLabels();
+  const { getCategoryLabel: _getCat, getFieldLabel } = useRenommage();
+  const getCategoryLabel = (cat: string) => _getCat('atm-merox-preflash', cat);
+  const getMeasureLabel = (key: string, defaultLabel?: string) => getFieldLabel('atm-merox-preflash', key, defaultLabel ?? key);
   const { isOutOfBounds } = useAtmMeroxBounds();
   const { hideEmptyColumns, canEdit } = useTableView();
   const [selectedHours, setSelectedHours] = React.useState<string[]>([...hours]);
@@ -81,6 +87,113 @@ const TableAtmMeroxPreFlash = ({
   const tableRef = React.useRef<HTMLTableElement>(null);
   /** Cellule en cours d’édition : on affiche la valeur brute pour permettre de saisir "14.5" (le point). */
   const [focusedCell, setFocusedCell] = React.useState<{ hourIndex: number; key: string } | null>(null);
+
+  // ── Ordre des colonnes (drag-and-drop admin, persiste en DB) ──────────────
+  const [categoryOrder, setCategoryOrder] = React.useState<string[]>(categories.map(c => c.category));
+  const [subRowOrders, setSubRowOrders] = React.useState<Record<string, string[]>>(
+    Object.fromEntries(categories.map(c => [c.category, [...c.subRows]]))
+  );
+  const [settingsLoaded, setSettingsLoaded] = React.useState(false);
+
+  React.useEffect(() => {
+    fetchTableSettings(FEUILLE_ID)
+      .then((data) => {
+        if (Array.isArray(data["column_order"]) && (data["column_order"] as string[]).length > 0)
+          setCategoryOrder(data["column_order"] as string[]);
+        if (data["subrow_orders"] && typeof data["subrow_orders"] === "object")
+          setSubRowOrders(data["subrow_orders"] as Record<string, string[]>);
+      })
+      .catch(() => {
+        try {
+          const co = localStorage.getItem("atm_merox_column_order");
+          if (co) setCategoryOrder(JSON.parse(co));
+          const sro = localStorage.getItem("atm_merox_subrow_orders");
+          if (sro) setSubRowOrders(JSON.parse(sro));
+        } catch (_) { /* ignore */ }
+      })
+      .finally(() => setSettingsLoaded(true));
+  }, []);
+
+  const saveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => {
+    if (!settingsLoaded) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveTableSettings(FEUILLE_ID, { column_order: categoryOrder, subrow_orders: subRowOrders }).catch(() => { /* silent */ });
+      localStorage.setItem("atm_merox_column_order", JSON.stringify(categoryOrder));
+      localStorage.setItem("atm_merox_subrow_orders", JSON.stringify(subRowOrders));
+    }, 800);
+  }, [categoryOrder, subRowOrders, settingsLoaded]);
+
+  type DragState = { type: "category"; cat: string } | { type: "subrow"; cat: string; sub: string } | null;
+  type DropTarget = { type: "category" | "subrow"; cat: string; sub?: string; side: "before" | "after" } | null;
+  const dragStateRef = React.useRef<DragState>(null);
+  const [dropTarget, setDropTarget] = React.useState<DropTarget>(null);
+
+  const getSide = (e: React.DragEvent, el: HTMLElement): "before" | "after" => {
+    const rect = el.getBoundingClientRect();
+    return e.clientX < rect.left + rect.width / 2 ? "before" : "after";
+  };
+
+  const handleCatDragStart = (e: React.DragEvent, cat: string) => {
+    dragStateRef.current = { type: "category", cat };
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const handleCatDragOver = (e: React.DragEvent, cat: string) => {
+    const ds = dragStateRef.current;
+    if (!ds || ds.type !== "category" || (ds as { cat: string }).cat === cat) return;
+    e.preventDefault();
+    setDropTarget({ type: "category", cat, side: getSide(e, e.currentTarget as HTMLElement) });
+  };
+  const handleCatDrop = (e: React.DragEvent, toCat: string) => {
+    e.preventDefault();
+    const ds = dragStateRef.current;
+    if (!ds || ds.type !== "category" || (ds as { cat: string }).cat === toCat || !dropTarget) { dragStateRef.current = null; setDropTarget(null); return; }
+    const fromCat = (ds as { cat: string }).cat;
+    const side = dropTarget.side;
+    setCategoryOrder(prev => {
+      const next = [...prev];
+      next.splice(next.indexOf(fromCat), 1);
+      const toIdx = next.indexOf(toCat);
+      next.splice(side === "before" ? toIdx : toIdx + 1, 0, fromCat);
+      return next;
+    });
+    dragStateRef.current = null;
+    setDropTarget(null);
+  };
+
+  const handleSubDragStart = (e: React.DragEvent, cat: string, sub: string) => {
+    e.stopPropagation();
+    dragStateRef.current = { type: "subrow", cat, sub };
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const handleSubDragOver = (e: React.DragEvent, cat: string, sub: string) => {
+    const ds = dragStateRef.current;
+    if (!ds || ds.type !== "subrow" || (ds as { cat: string; sub: string }).cat !== cat || (ds as { cat: string; sub: string }).sub === sub) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDropTarget({ type: "subrow", cat, sub, side: getSide(e, e.currentTarget as HTMLElement) });
+  };
+  const handleSubDrop = (e: React.DragEvent, toCat: string, toSub: string) => {
+    e.preventDefault();
+    const ds = dragStateRef.current;
+    if (!ds || ds.type !== "subrow" || (ds as { cat: string; sub: string }).cat !== toCat || (ds as { cat: string; sub: string }).sub === toSub || !dropTarget) { dragStateRef.current = null; setDropTarget(null); return; }
+    const fromSub = (ds as { cat: string; sub: string }).sub;
+    const side = dropTarget.side;
+    setSubRowOrders(prev => {
+      const base = prev[toCat] ?? categories.find(c => c.category === toCat)!.subRows;
+      const next = [...base];
+      next.splice(next.indexOf(fromSub), 1);
+      const toIdx = next.indexOf(toSub);
+      next.splice(side === "before" ? toIdx : toIdx + 1, 0, fromSub);
+      return { ...prev, [toCat]: next };
+    });
+    dragStateRef.current = null;
+    setDropTarget(null);
+  };
+
+  const clearDrag = () => { dragStateRef.current = null; setDropTarget(null); };
+  // ─────────────────────────────────────────────────────────────────────────
 
   const handleHourToggle = (hour: string) => {
     setSelectedHours((prev) =>
@@ -126,13 +239,23 @@ const TableAtmMeroxPreFlash = ({
     return () => document.removeEventListener('click', clickHandler);
   });
 
-  const filteredData = data.filter((row) => selectedHours.includes(row.hour));
-  const currentCategories = categories
+  const filteredData = selectedHours
+    .map((h) => data.find((row) => row.hour === h))
+    .filter((row): row is HourRow => row != null);
+  const currentCategories = [...categories]
+    .sort((a, b) => {
+      const ai = categoryOrder.indexOf(a.category);
+      const bi = categoryOrder.indexOf(b.category);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    })
     .filter((cat) => selectedCategories.includes(cat.category))
-    .map((cat) => ({
-      ...cat,
-      subRows: cat.subRows.filter((sub) => selectedSubRows.includes(sub)),
-    }))
+    .map((cat) => {
+      const orderedSubs = subRowOrders[cat.category] ?? cat.subRows;
+      return {
+        ...cat,
+        subRows: orderedSubs.filter(sub => cat.subRows.includes(sub) && selectedSubRows.includes(sub)),
+      };
+    })
     .filter((cat) => cat.subRows.length > 0);
 
   const totalRows = filteredData.length;
@@ -390,26 +513,59 @@ const TableAtmMeroxPreFlash = ({
                   className="sticky left-0 z-20 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 border-t-0 border-l-0 bg-[#eff6ff] py-1.5 pl-2 pr-2 dark:border-strokedark dark:border-t-0 dark:border-l-0 dark:bg-[#273342]"
                   aria-label=""
                 />
-                {visibleCategories.map((cat) => (
-                  <th
-                    key={cat.category || '__empty__'}
-                    colSpan={cat.subRows.length}
-                    className="sticky top-0 z-10 min-w-0 border-b border-r border-stroke/70 bg-primary py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark"
-                  >
-                    {getCategoryLabel(cat.category)}
-                  </th>
-                ))}
+                {visibleCategories.map((cat) => {
+                  const isCatDragging   = dragStateRef.current?.type === "category" && (dragStateRef.current as { cat: string }).cat === cat.category;
+                  const isCatDropBefore = dropTarget?.type === "category" && dropTarget.cat === cat.category && dropTarget.side === "before";
+                  const isCatDropAfter  = dropTarget?.type === "category" && dropTarget.cat === cat.category && dropTarget.side === "after";
+                  return (
+                    <th
+                      key={cat.category || "__empty__"}
+                      colSpan={cat.subRows.length}
+                      draggable={canEdit}
+                      onDragStart={(e) => handleCatDragStart(e, cat.category)}
+                      onDragOver={(e) => handleCatDragOver(e, cat.category)}
+                      onDragLeave={() => setDropTarget(null)}
+                      onDrop={(e) => handleCatDrop(e, cat.category)}
+                      onDragEnd={clearDrag}
+                      className={`sticky top-0 z-10 min-w-0 border-b border-r border-stroke/70 py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark transition-colors
+                        ${isCatDragging ? "bg-[#0d1a47]" : "bg-primary"}
+                        ${canEdit ? "cursor-grab active:cursor-grabbing" : ""}
+                        ${isCatDropBefore ? "border-l-[3px] border-l-yellow-300" : ""}
+                        ${isCatDropAfter  ? "border-r-[3px] border-r-yellow-300" : ""}
+                      `}
+                    >
+                      {getCategoryLabel(cat.category)}
+                    </th>
+                  );
+                })}
               </tr>
               <tr>
                 {visibleCategories.flatMap((cat) =>
-                  cat.subRows.map((subRow) => (
-                    <th
-                      key={getValueKey(cat.category, subRow)}
-                      className="sticky top-7 z-10 w-[7rem] min-w-[7rem] max-w-[7rem] border-r border-b border-stroke/70 bg-primary/90 py-1 px-1 text-center text-[11px] font-medium text-white/95 dark:border-strokedark"
-                    >
-                      <span className="block truncate" title={getMeasureLabel(getValueKey(cat.category, subRow))}>{getMeasureLabel(getValueKey(cat.category, subRow))}</span>
-                    </th>
-                  ))
+                  cat.subRows.map((subRow) => {
+                    const key = getValueKey(cat.category, subRow);
+                    const isSubDragging   = dragStateRef.current?.type === "subrow" && (dragStateRef.current as { cat: string; sub: string }).cat === cat.category && (dragStateRef.current as { cat: string; sub: string }).sub === subRow;
+                    const isSubDropBefore = dropTarget?.type === "subrow" && dropTarget.cat === cat.category && dropTarget.sub === subRow && dropTarget.side === "before";
+                    const isSubDropAfter  = dropTarget?.type === "subrow" && dropTarget.cat === cat.category && dropTarget.sub === subRow && dropTarget.side === "after";
+                    return (
+                      <th
+                        key={key}
+                        draggable={canEdit}
+                        onDragStart={(e) => handleSubDragStart(e, cat.category, subRow)}
+                        onDragOver={(e) => handleSubDragOver(e, cat.category, subRow)}
+                        onDragLeave={() => setDropTarget(null)}
+                        onDrop={(e) => handleSubDrop(e, cat.category, subRow)}
+                        onDragEnd={clearDrag}
+                        className={`sticky top-7 z-10 w-[7rem] min-w-[7rem] max-w-[7rem] border-r border-b border-stroke/70 py-1 px-1 text-center text-[11px] font-medium text-white/95 dark:border-strokedark transition-colors
+                          ${isSubDragging ? "bg-[#0d1a47]" : "bg-primary/90"}
+                          ${canEdit ? "cursor-grab active:cursor-grabbing" : ""}
+                          ${isSubDropBefore ? "border-l-[3px] border-l-yellow-300" : ""}
+                          ${isSubDropAfter  ? "border-r-[3px] border-r-yellow-300" : ""}
+                        `}
+                      >
+                        <span className="block truncate" title={getMeasureLabel(key, subRow)}>{getMeasureLabel(key, subRow)}</span>
+                      </th>
+                    );
+                  })
                 )}
               </tr>
             </thead>

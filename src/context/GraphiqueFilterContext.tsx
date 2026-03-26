@@ -22,7 +22,7 @@ interface GraphiqueFilterContextType {
 }
 
 const GraphiqueFilterContext = createContext<GraphiqueFilterContextType>({
-  duration: 'day',
+  duration: 'week',
   setDuration: () => {},
   selectedDate: new Date().toISOString().slice(0, 10),
   setSelectedDate: () => {},
@@ -33,7 +33,7 @@ const GraphiqueFilterContext = createContext<GraphiqueFilterContextType>({
 });
 
 export const GraphiqueFilterProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [duration, setDuration] = useState<DurationFilter>('day');
+  const [duration, setDuration] = useState<DurationFilter>('week');
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [selectedWeek, setSelectedWeek] = useState(() => getISOWeekString(new Date()));
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));

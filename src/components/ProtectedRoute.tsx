@@ -8,10 +8,11 @@ interface ProtectedRouteProps {
 
 /**
  * Redirige vers /login si l'utilisateur n'est pas connecté.
+ * Redirige vers /force-change-password si un changement de mot de passe est requis.
  * Préserve la destination dans state pour redirection après connexion.
  */
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -24,6 +25,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
+  }
+
+  // Forcer le changement de mot de passe à la première connexion
+  if (user?.mustChangePassword && location.pathname !== '/force-change-password') {
+    return <Navigate to="/force-change-password" replace />;
   }
 
   return <>{children}</>;

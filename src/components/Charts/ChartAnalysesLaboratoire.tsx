@@ -2,6 +2,7 @@ import { ApexOptions } from 'apexcharts';
 import React, { useEffect, useMemo, useState } from 'react';
 import ReactApexChart from 'react-apexcharts';
 import { useAnalysesLaboBounds } from '../../context/AnalysesLaboBoundsContext';
+import useColorMode from '../../hooks/useColorMode';
 import {
   ANALYSES_MEASURE_NAMES,
   AnalyseRow,
@@ -365,6 +366,7 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
 
   const measureNames = useMemo(() => data.map((r) => r.property), [data]);
   const [internalMeasure, setInternalMeasure] = useState<string>(() => measureNames[0] ?? '');
+  const [colorMode] = useColorMode();
   const [internalProduct, setInternalProduct] = useState<ProductKey>(products[0]);
   const [internalDuration, setInternalDuration] = useState<DurationFilter>('day');
 
@@ -733,9 +735,7 @@ const ChartAnalysesLaboratoire: React.FC<ChartAnalysesLaboratoireProps> = ({
     }));
   }, [duration, chartData.series, isDay, isWeek]);
 
-  const isDarkMode =
-    typeof document !== 'undefined' &&
-    document.documentElement.classList.contains('dark');
+  const isDarkMode = colorMode === 'dark';
 
   const options: ApexOptions = useMemo(() => {
     if (isDay) {

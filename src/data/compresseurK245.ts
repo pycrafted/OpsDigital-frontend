@@ -20,7 +20,7 @@ export const COMPRESSEUR_K245_CATEGORIES: CategoryData[] = [
   { category: 'cotes', subRows: ['cote d 202', 'cote d350'] },
 ];
 
-export const COMPRESSEUR_K245_HOURS = ['h7', 'h11', 'h15', 'h19', 'h23', 'h3'] as const;
+export const COMPRESSEUR_K245_HOURS = ['h3', 'h7', 'h11', 'h15', 'h19', 'h23'] as const;
 export type CompresseurK245HourKey = (typeof COMPRESSEUR_K245_HOURS)[number];
 
 export const compresseurK245HourLabels: Record<CompresseurK245HourKey, string> = {

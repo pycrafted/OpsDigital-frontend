@@ -9,6 +9,9 @@ import {
 import { useAnalysesLaboLabels } from '../../context/AnalysesLaboLabelsContext';
 import { useAnalysesLaboBounds } from '../../context/AnalysesLaboBoundsContext';
 import { useTableView } from '../../context/TableViewContext';
+import { fetchTableSettings, saveTableSettings } from '../../api/tableSettings';
+
+const FEUILLE_ID = "analyses-laboratoire";
 
 export interface TableAnalysesLaboratoireProps {
   data: AnalyseRow[];
@@ -75,6 +78,110 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
   const [showHourDropdown, setShowHourDropdown] = React.useState(false);
   /** Cellule en cours d’édition : on affiche la valeur brute pour permettre de saisir "14.5" (le point). */
   const [focusedCell, setFocusedCell] = React.useState<{ rowIndex: number; product: ProductKey; hour: HourKey } | null>(null);
+
+  // ── Ordre des colonnes (drag-and-drop admin, persiste en DB) ──────────────
+  const [productOrder, setProductOrder] = React.useState<string[]>([...products]);
+  const [hourOrder, setHourOrder] = React.useState<string[]>([...hours]);
+  const [settingsLoaded, setSettingsLoaded] = React.useState(false);
+
+  React.useEffect(() => {
+    fetchTableSettings(FEUILLE_ID)
+      .then((data) => {
+        if (Array.isArray(data["column_order"]) && (data["column_order"] as string[]).length > 0)
+          setProductOrder(data["column_order"] as string[]);
+        if (Array.isArray(data["hour_order"]) && (data["hour_order"] as string[]).length > 0)
+          setHourOrder(data["hour_order"] as string[]);
+      })
+      .catch(() => {
+        try {
+          const co = localStorage.getItem("analyses_column_order");
+          if (co) setProductOrder(JSON.parse(co));
+          const ho = localStorage.getItem("analyses_hour_order");
+          if (ho) setHourOrder(JSON.parse(ho));
+        } catch (_) { /* ignore */ }
+      })
+      .finally(() => setSettingsLoaded(true));
+  }, []);
+
+  const saveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => {
+    if (!settingsLoaded) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveTableSettings(FEUILLE_ID, { column_order: productOrder, hour_order: hourOrder }).catch(() => { /* silent */ });
+      localStorage.setItem("analyses_column_order", JSON.stringify(productOrder));
+      localStorage.setItem("analyses_hour_order", JSON.stringify(hourOrder));
+    }, 800);
+  }, [productOrder, hourOrder, settingsLoaded]);
+
+  type DragState = { type: "product"; product: string } | { type: "hour"; product: string; hour: string } | null;
+  type DropTarget = { type: "product" | "hour"; product: string; hour?: string; side: "before" | "after" } | null;
+  const dragStateRef = React.useRef<DragState>(null);
+  const [dropTarget, setDropTarget] = React.useState<DropTarget>(null);
+
+  const getSide = (e: React.DragEvent, el: HTMLElement): "before" | "after" => {
+    const rect = el.getBoundingClientRect();
+    return e.clientX < rect.left + rect.width / 2 ? "before" : "after";
+  };
+
+  const handleProductDragStart = (e: React.DragEvent, product: string) => {
+    dragStateRef.current = { type: "product", product };
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const handleProductDragOver = (e: React.DragEvent, product: string) => {
+    const ds = dragStateRef.current;
+    if (!ds || ds.type !== "product" || (ds as { product: string }).product === product) return;
+    e.preventDefault();
+    setDropTarget({ type: "product", product, side: getSide(e, e.currentTarget as HTMLElement) });
+  };
+  const handleProductDrop = (e: React.DragEvent, toProduct: string) => {
+    e.preventDefault();
+    const ds = dragStateRef.current;
+    if (!ds || ds.type !== "product" || (ds as { product: string }).product === toProduct || !dropTarget) { dragStateRef.current = null; setDropTarget(null); return; }
+    const fromProduct = (ds as { product: string }).product;
+    const side = dropTarget.side;
+    setProductOrder(prev => {
+      const next = [...prev];
+      next.splice(next.indexOf(fromProduct), 1);
+      const toIdx = next.indexOf(toProduct);
+      next.splice(side === "before" ? toIdx : toIdx + 1, 0, fromProduct);
+      return next;
+    });
+    dragStateRef.current = null;
+    setDropTarget(null);
+  };
+
+  const handleHourDragStart = (e: React.DragEvent, product: string, hour: string) => {
+    e.stopPropagation();
+    dragStateRef.current = { type: "hour", product, hour };
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const handleHourDragOver = (e: React.DragEvent, product: string, hour: string) => {
+    const ds = dragStateRef.current;
+    if (!ds || ds.type !== "hour" || (ds as { product: string; hour: string }).product !== product || (ds as { product: string; hour: string }).hour === hour) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDropTarget({ type: "hour", product, hour, side: getSide(e, e.currentTarget as HTMLElement) });
+  };
+  const handleHourDrop = (e: React.DragEvent, toProduct: string, toHour: string) => {
+    e.preventDefault();
+    const ds = dragStateRef.current;
+    if (!ds || ds.type !== "hour" || (ds as { product: string; hour: string }).product !== toProduct || (ds as { product: string; hour: string }).hour === toHour || !dropTarget) { dragStateRef.current = null; setDropTarget(null); return; }
+    const fromHour = (ds as { product: string; hour: string }).hour;
+    const side = dropTarget.side;
+    setHourOrder(prev => {
+      const next = [...prev];
+      next.splice(next.indexOf(fromHour), 1);
+      const toIdx = next.indexOf(toHour);
+      next.splice(side === "before" ? toIdx : toIdx + 1, 0, fromHour);
+      return next;
+    });
+    dragStateRef.current = null;
+    setDropTarget(null);
+  };
+
+  const clearDrag = () => { dragStateRef.current = null; setDropTarget(null); };
+  // ─────────────────────────────────────────────────────────────────────────
   const productDropdownRef = React.useRef<HTMLDivElement>(null);
   const productTriggerRef = React.useRef<HTMLDivElement>(null);
   const measureDropdownRef = React.useRef<HTMLDivElement>(null);
@@ -114,8 +221,12 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
     );
   };
 
-  const filteredHours = hours.filter((h) => selectedHours.includes(h));
-  const filteredProducts = products.filter((p) => selectedProducts.includes(p));
+  const filteredHours = [...hours]
+    .sort((a, b) => (hourOrder.indexOf(a) === -1 ? 999 : hourOrder.indexOf(a)) - (hourOrder.indexOf(b) === -1 ? 999 : hourOrder.indexOf(b)))
+    .filter((h) => selectedHours.includes(h));
+  const filteredProducts = [...products]
+    .sort((a, b) => (productOrder.indexOf(a) === -1 ? 999 : productOrder.indexOf(a)) - (productOrder.indexOf(b) === -1 ? 999 : productOrder.indexOf(b)))
+    .filter((p) => selectedProducts.includes(p));
   const filteredData = data.filter((row) => selectedMeasures.includes(row.property));
   const visibleProducts = hideEmptyColumns
     ? filteredProducts.filter((product) =>
@@ -387,26 +498,58 @@ const TableAnalysesLaboratoire: React.FC<TableAnalysesLaboratoireProps> = ({ dat
                 className="sticky left-0 z-20 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 border-t-0 border-l-0 bg-[#eff6ff] py-1.5 pl-2 pr-2 dark:border-strokedark dark:border-t-0 dark:border-l-0 dark:bg-[#273342]"
                 aria-label=""
               />
-              {visibleProducts.map((product) => (
-                <th
-                  key={product}
-                  colSpan={filteredHours.length}
-                  className="sticky top-0 z-10 min-w-[5.5rem] border-b border-r border-stroke/70 bg-primary py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark"
-                >
-                  {getProductLabel(product)}
-                </th>
-              ))}
+              {visibleProducts.map((product) => {
+                const isProdDragging = dragStateRef.current?.type === "product" && (dragStateRef.current as { product: string }).product === product;
+                const isProdDropBefore = dropTarget?.type === "product" && dropTarget.product === product && dropTarget.side === "before";
+                const isProdDropAfter  = dropTarget?.type === "product" && dropTarget.product === product && dropTarget.side === "after";
+                return (
+                  <th
+                    key={product}
+                    colSpan={filteredHours.length}
+                    draggable={canEdit}
+                    onDragStart={(e) => handleProductDragStart(e, product)}
+                    onDragOver={(e) => handleProductDragOver(e, product)}
+                    onDragLeave={() => setDropTarget(null)}
+                    onDrop={(e) => handleProductDrop(e, product)}
+                    onDragEnd={clearDrag}
+                    className={`sticky top-0 z-10 min-w-[5.5rem] border-b border-r border-stroke/70 py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark transition-colors
+                      ${isProdDragging ? "bg-[#0d1a47]" : "bg-primary"}
+                      ${canEdit ? "cursor-grab active:cursor-grabbing" : ""}
+                      ${isProdDropBefore ? "border-l-[3px] border-l-yellow-300" : ""}
+                      ${isProdDropAfter  ? "border-r-[3px] border-r-yellow-300" : ""}
+                    `}
+                  >
+                    {getProductLabel(product)}
+                  </th>
+                );
+              })}
             </tr>
             <tr>
               {visibleProducts.map((product) =>
-                filteredHours.map((hour) => (
-                  <th
-                    key={`${product}-${hour}`}
-                    className="sticky top-7 z-10 min-w-[5.5rem] w-[5.5rem] border-r border-b border-stroke/70 bg-primary/90 py-1 text-center text-[11px] font-medium text-white/95 dark:border-strokedark"
-                  >
-                    {getHourLabel(hour)}
-                  </th>
-                ))
+                filteredHours.map((hour) => {
+                  const isHourDragging = dragStateRef.current?.type === "hour" && (dragStateRef.current as { product: string; hour: string }).product === product && (dragStateRef.current as { product: string; hour: string }).hour === hour;
+                  const isHourDropBefore = dropTarget?.type === "hour" && dropTarget.product === product && dropTarget.hour === hour && dropTarget.side === "before";
+                  const isHourDropAfter  = dropTarget?.type === "hour" && dropTarget.product === product && dropTarget.hour === hour && dropTarget.side === "after";
+                  return (
+                    <th
+                      key={`${product}-${hour}`}
+                      draggable={canEdit}
+                      onDragStart={(e) => handleHourDragStart(e, product, hour)}
+                      onDragOver={(e) => handleHourDragOver(e, product, hour)}
+                      onDragLeave={() => setDropTarget(null)}
+                      onDrop={(e) => handleHourDrop(e, product, hour)}
+                      onDragEnd={clearDrag}
+                      className={`sticky top-7 z-10 min-w-[5.5rem] w-[5.5rem] border-r border-b border-stroke/70 py-1 text-center text-[11px] font-medium text-white/95 dark:border-strokedark transition-colors
+                        ${isHourDragging ? "bg-[#0d1a47]" : "bg-primary/90"}
+                        ${canEdit ? "cursor-grab active:cursor-grabbing" : ""}
+                        ${isHourDropBefore ? "border-l-[3px] border-l-yellow-300" : ""}
+                        ${isHourDropAfter  ? "border-r-[3px] border-r-yellow-300" : ""}
+                      `}
+                    >
+                      {getHourLabel(hour)}
+                    </th>
+                  );
+                })
               )}
             </tr>
           </thead>

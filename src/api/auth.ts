@@ -1,5 +1,5 @@
 /**
- * API d'authentification (login, refresh, me).
+ * API d'authentification (login, refresh, me, admin).
  */
 import { getAccessToken, getRefreshToken, setTokens } from './authStorage';
 
@@ -11,8 +11,8 @@ export interface AuthUser {
   id: number;
   email: string;
   fullName: string;
-  poste: string;
-  avatarUrl?: string | null;
+  role: 'admin' | 'simple_user';
+  mustChangePassword: boolean;
 }
 
 export interface LoginResponse {
@@ -25,6 +25,15 @@ export interface RefreshResponse {
   access: string;
 }
 
+export interface AdminUser {
+  id: number;
+  email: string;
+  fullName: string;
+  role: 'admin' | 'simple_user';
+  mustChangePassword: boolean;
+  is_active: boolean;
+}
+
 /** Réponse erreur API (detail ou champs de validation). */
 function readError(res: Response, body: unknown): string {
   if (body && typeof body === 'object' && 'detail' in body && typeof (body as { detail: unknown }).detail === 'string') {
@@ -32,7 +41,7 @@ function readError(res: Response, body: unknown): string {
   }
   if (body && typeof body === 'object') {
     const o = body as Record<string, unknown>;
-    for (const key of ['current_password', 'new_password', 'email', 'password']) {
+    for (const key of ['current_password', 'new_password', 'email', 'password', 'non_field_errors']) {
       const val = o[key];
       if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'string') return val[0];
       if (typeof val === 'string') return val;
@@ -93,7 +102,6 @@ export async function getMe(accessTokenParam?: string | null): Promise<AuthUser>
 
 export interface UpdateMePayload {
   fullName?: string;
-  poste?: string;
   email?: string;
 }
 
@@ -131,29 +139,77 @@ export async function changePassword(newPassword: string): Promise<void> {
   if (!res.ok) throw new Error(readError(res, data));
 }
 
-export async function uploadAvatar(file: File): Promise<AuthUser> {
-  const token = getAccessToken();
-  if (!token) throw new Error('Non authentifié');
-  const formData = new FormData();
-  formData.append('avatar', file);
-  const res = await fetch(`${AUTH_BASE}/me/avatar/`, {
+// ── Mot de passe oublié ────────────────────────────────────────────────────
+
+export async function forgotPassword(email: string): Promise<string> {
+  const res = await fetch(`${AUTH_BASE}/forgot-password/`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email.trim().toLowerCase() }),
   });
   const data = (await res.json().catch(() => ({}))) as unknown;
   if (!res.ok) throw new Error(readError(res, data));
-  return data as AuthUser;
+  return (data as { detail: string }).detail;
 }
 
-export async function deleteAvatar(): Promise<AuthUser> {
-  const token = getAccessToken();
-  if (!token) throw new Error('Non authentifié');
-  const res = await fetch(`${AUTH_BASE}/me/avatar/`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
+export async function verifyOTP(email: string, otp: string): Promise<string> {
+  const res = await fetch(`${AUTH_BASE}/verify-otp/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email.trim().toLowerCase(), otp }),
   });
   const data = (await res.json().catch(() => ({}))) as unknown;
   if (!res.ok) throw new Error(readError(res, data));
-  return data as AuthUser;
+  return (data as { reset_token: string }).reset_token;
 }
+
+export async function resetPassword(resetToken: string, newPassword: string): Promise<void> {
+  const res = await fetch(`${AUTH_BASE}/reset-password/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reset_token: resetToken, new_password: newPassword }),
+  });
+  const data = (await res.json().catch(() => ({}))) as unknown;
+  if (!res.ok) throw new Error(readError(res, data));
+}
+
+// ── Admin API ──────────────────────────────────────────────────────────────
+
+function adminHeaders(): HeadersInit {
+  const token = getAccessToken();
+  if (!token) throw new Error('Non authentifié');
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+}
+
+export async function adminGetUsers(): Promise<AdminUser[]> {
+  const res = await fetch(`${AUTH_BASE}/admin/users/`, { headers: adminHeaders() });
+  const data = (await res.json().catch(() => ([]))) as unknown;
+  if (!res.ok) throw new Error(readError(res, data));
+  return data as AdminUser[];
+}
+
+export async function adminCreateUser(payload: {
+  email: string;
+  fullName?: string;
+  role: 'admin' | 'simple_user';
+}): Promise<AdminUser> {
+  const res = await fetch(`${AUTH_BASE}/admin/users/`, {
+    method: 'POST',
+    headers: adminHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = (await res.json().catch(() => ({}))) as unknown;
+  if (!res.ok) throw new Error(readError(res, data));
+  return data as AdminUser;
+}
+
+export async function adminToggleUserActive(userId: number): Promise<AdminUser> {
+  const res = await fetch(`${AUTH_BASE}/admin/users/${userId}/toggle-active/`, {
+    method: 'PATCH',
+    headers: adminHeaders(),
+  });
+  const data = (await res.json().catch(() => ({}))) as unknown;
+  if (!res.ok) throw new Error(readError(res, data));
+  return data as AdminUser;
+}
+

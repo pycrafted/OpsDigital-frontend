@@ -35,6 +35,8 @@ import {
   fetchMouvementBacsBacTypes,
   type BacTypeDto,
 } from '../api/mouvementDesBacs';
+import { useRenommage } from '../context/RenommageContext';
+import { cacheKey, getCached, setCached, invalidateCacheByPrefix } from '../utils/fetchCache';
 
 const TABLEAU_FILTER_OPTIONS = [
   'Analyses du laboratoire',
@@ -55,6 +57,7 @@ const CHEVRON_DOWN = (
 );
 
 const AnalysesLaboratoire = () => {
+  const { getFeuilleTitle } = useRenommage();
   const [searchParams] = useSearchParams();
   const showAllTables = searchParams.get('tableau') === 'Tout';
   const [data, setData] = useState<AnalyseRow[]>(() => createInitialAnalysesData());
@@ -110,10 +113,17 @@ const AnalysesLaboratoire = () => {
   const lastSavedAnalysesRef = useRef<AnalyseRow[]>([]);
   useEffect(() => {
     if (!isAnalysesLabo && !showAllTables) return;
+    const _cached = getCached<AnalyseRow[]>(cacheKey('analyses', 'day', selectedDate));
+    if (_cached !== null) {
+      const initialData = _cached.length > 0 ? _cached : createInitialAnalysesData();
+      setData(initialData); lastSavedAnalysesRef.current = initialData; setAnalysesDataIsDirty(false); setLoadingAnalyses(false);
+      return;
+    }
     let cancelled = false;
     setLoadingAnalyses(true);
     fetchAnalysesByDate(selectedDate)
       .then((rows) => {
+        setCached(cacheKey('analyses', 'day', selectedDate), rows);
         if (!cancelled) {
           const initialData = rows.length > 0 ? rows : createInitialAnalysesData();
           setData(initialData);
@@ -141,10 +151,17 @@ const AnalysesLaboratoire = () => {
   const lastSavedReformateurRef = useRef<HourRow[]>([]);
   useEffect(() => {
     if (!isReformateurTableau && !showAllTables) return;
+    const _cached = getCached<HourRow[]>(cacheKey('reformateur', 'day', selectedDate));
+    if (_cached !== null) {
+      const initialData = _cached.length > 0 ? _cached : createInitialReformateurData();
+      setReformateurData(initialData); lastSavedReformateurRef.current = initialData; setReformateurDataIsDirty(false); setLoadingReformateur(false);
+      return;
+    }
     let cancelled = false;
     setLoadingReformateur(true);
     fetchReformateurByDate(selectedDate)
       .then((rows) => {
+        setCached(cacheKey('reformateur', 'day', selectedDate), rows);
         if (!cancelled) {
           const initialData = rows.length > 0 ? rows : createInitialReformateurData();
           setReformateurData(initialData);
@@ -172,10 +189,17 @@ const AnalysesLaboratoire = () => {
   const lastSavedProductionRef = useRef<ProductionHourRow[]>([]);
   useEffect(() => {
     if (!isProductionTableau && !showAllTables) return;
+    const _cached = getCached<ProductionHourRow[]>(cacheKey('production', 'day', selectedDate));
+    if (_cached !== null) {
+      const initialData = _cached.length > 0 ? _cached : createInitialProductionData();
+      setProductionData(initialData); lastSavedProductionRef.current = initialData; setProductionDataIsDirty(false); setLoadingProduction(false);
+      return;
+    }
     let cancelled = false;
     setLoadingProduction(true);
     fetchProductionByDate(selectedDate)
       .then((rows) => {
+        setCached(cacheKey('production', 'day', selectedDate), rows);
         if (!cancelled) {
           const initialData = rows.length > 0 ? rows : createInitialProductionData();
           setProductionData(initialData);
@@ -203,10 +227,17 @@ const AnalysesLaboratoire = () => {
   const lastSavedAtmMeroxRef = useRef<AtmMeroxHourRow[]>([]);
   useEffect(() => {
     if (!isAtmMeroxTableau && !showAllTables) return;
+    const _cached = getCached<AtmMeroxHourRow[]>(cacheKey('atm-merox-pre-flash', 'day', selectedDate));
+    if (_cached !== null) {
+      const initialData = _cached.length > 0 ? _cached : createInitialAtmMeroxData();
+      setAtmMeroxData(initialData); lastSavedAtmMeroxRef.current = initialData; setAtmMeroxDataIsDirty(false); setLoadingAtmMerox(false);
+      return;
+    }
     let cancelled = false;
     setLoadingAtmMerox(true);
     fetchAtmMeroxByDate(selectedDate)
       .then((rows) => {
+        setCached(cacheKey('atm-merox-pre-flash', 'day', selectedDate), rows);
         if (!cancelled) {
           const initialData = rows.length > 0 ? rows : createInitialAtmMeroxData();
           setAtmMeroxData(initialData);
@@ -234,10 +265,17 @@ const AnalysesLaboratoire = () => {
   const lastSavedCompresseurK245Ref = useRef<CompresseurK245HourRow[]>([]);
   useEffect(() => {
     if (!isCompresseurK245Tableau && !showAllTables) return;
+    const _cached = getCached<CompresseurK245HourRow[]>(cacheKey('compresseur-k245', 'day', selectedDate));
+    if (_cached !== null) {
+      const initialData = _cached.length > 0 ? _cached : createInitialCompresseurK245Data();
+      setCompresseurK245Data(initialData); lastSavedCompresseurK245Ref.current = initialData; setCompresseurK245DataIsDirty(false); setLoadingCompresseurK245(false);
+      return;
+    }
     let cancelled = false;
     setLoadingCompresseurK245(true);
     fetchCompresseurK245ByDate(selectedDate)
       .then((rows) => {
+        setCached(cacheKey('compresseur-k245', 'day', selectedDate), rows);
         if (!cancelled) {
           const initialData = rows.length > 0 ? rows : createInitialCompresseurK245Data();
           setCompresseurK245Data(initialData);
@@ -265,10 +303,17 @@ const AnalysesLaboratoire = () => {
   const lastSavedCompresseurK244Ref = useRef<CompresseurK244HourRow[]>([]);
   useEffect(() => {
     if (!isCompresseurK244Tableau && !showAllTables) return;
+    const _cached = getCached<CompresseurK244HourRow[]>(cacheKey('compresseur-k244', 'day', selectedDate));
+    if (_cached !== null) {
+      const initialData = _cached.length > 0 ? _cached : createInitialCompresseurK244Data();
+      setCompresseurK244Data(initialData); lastSavedCompresseurK244Ref.current = initialData; setCompresseurK244DataIsDirty(false); setLoadingCompresseurK244(false);
+      return;
+    }
     let cancelled = false;
     setLoadingCompresseurK244(true);
     fetchCompresseurK244ByDate(selectedDate)
       .then((rows) => {
+        setCached(cacheKey('compresseur-k244', 'day', selectedDate), rows);
         if (!cancelled) {
           const initialData = rows.length > 0 ? rows : createInitialCompresseurK244Data();
           setCompresseurK244Data(initialData);
@@ -296,10 +341,17 @@ const AnalysesLaboratoire = () => {
   const lastSavedGazRef = useRef<GazHourRow[]>([]);
   useEffect(() => {
     if (!isGazTableau && !showAllTables) return;
+    const _cached = getCached<GazHourRow[]>(cacheKey('gaz', 'day', selectedDate));
+    if (_cached !== null) {
+      const initialData = _cached.length > 0 ? _cached : createInitialGazData();
+      setGazData(initialData); lastSavedGazRef.current = initialData; setGazDataIsDirty(false); setLoadingGaz(false);
+      return;
+    }
     let cancelled = false;
     setLoadingGaz(true);
     fetchGazByDate(selectedDate)
       .then((rows) => {
+        setCached(cacheKey('gaz', 'day', selectedDate), rows);
         if (!cancelled) {
           const initialData = rows.length > 0 ? rows : createInitialGazData();
           setGazData(initialData);
@@ -338,10 +390,18 @@ const AnalysesLaboratoire = () => {
   const lastSavedMouvementBacsRef = useRef<HourRowWithBacs[]>([]);
   useEffect(() => {
     if (!isMouvementDesBacsTableau && !showAllTables) return;
+    const _cached = getCached<HourRowWithBacs[]>(cacheKey('mouvement-des-bacs', 'day', selectedDate));
+    if (_cached !== null) {
+      const initialData = _cached.length > 0 ? _cached : createInitialMouvementBacsData().map((r) => ({ ...r, bacs: {} }));
+      setMouvementBacsData(initialData); lastSavedMouvementBacsRef.current = initialData; setMouvementBacsDataIsDirty(false);
+      setMouvementBacsBacs(initialData[0]?.bacs ?? {}); setLoadingMouvementBacs(false);
+      return;
+    }
     let cancelled = false;
     setLoadingMouvementBacs(true);
     fetchMouvementBacsByDate(selectedDate)
       .then((rows) => {
+        setCached(cacheKey('mouvement-des-bacs', 'day', selectedDate), rows);
         if (!cancelled) {
           const initialData = rows.length > 0 ? rows : createInitialMouvementBacsData().map((r) => ({ ...r, bacs: {} }));
           setMouvementBacsData(initialData);
@@ -376,6 +436,7 @@ const AnalysesLaboratoire = () => {
     setSavingAnalyses(true);
     saveAnalysesBulk(selectedDate, data)
       .then(() => {
+        invalidateCacheByPrefix(cacheKey('analyses', 'day', selectedDate));
         lastSavedAnalysesRef.current = data;
         setAnalysesDataIsDirty(false);
       })
@@ -392,6 +453,7 @@ const AnalysesLaboratoire = () => {
     setSavingReformateur(true);
     saveReformateurBulk(selectedDate, reformateurData)
       .then(() => {
+        invalidateCacheByPrefix(cacheKey('reformateur', 'day', selectedDate));
         lastSavedReformateurRef.current = reformateurData;
         setReformateurDataIsDirty(false);
       })
@@ -408,6 +470,7 @@ const AnalysesLaboratoire = () => {
     setSavingProduction(true);
     saveProductionBulk(selectedDate, productionData)
       .then(() => {
+        invalidateCacheByPrefix(cacheKey('production', 'day', selectedDate));
         lastSavedProductionRef.current = productionData;
         setProductionDataIsDirty(false);
       })
@@ -424,6 +487,7 @@ const AnalysesLaboratoire = () => {
     setSavingAtmMerox(true);
     saveAtmMeroxBulk(selectedDate, atmMeroxData)
       .then(() => {
+        invalidateCacheByPrefix(cacheKey('atm-merox-pre-flash', 'day', selectedDate));
         lastSavedAtmMeroxRef.current = atmMeroxData;
         setAtmMeroxDataIsDirty(false);
       })
@@ -440,6 +504,7 @@ const AnalysesLaboratoire = () => {
     setSavingCompresseurK245(true);
     saveCompresseurK245Bulk(selectedDate, compresseurK245Data)
       .then(() => {
+        invalidateCacheByPrefix(cacheKey('compresseur-k245', 'day', selectedDate));
         lastSavedCompresseurK245Ref.current = compresseurK245Data;
         setCompresseurK245DataIsDirty(false);
       })
@@ -456,6 +521,7 @@ const AnalysesLaboratoire = () => {
     setSavingCompresseurK244(true);
     saveCompresseurK244Bulk(selectedDate, compresseurK244Data)
       .then(() => {
+        invalidateCacheByPrefix(cacheKey('compresseur-k244', 'day', selectedDate));
         lastSavedCompresseurK244Ref.current = compresseurK244Data;
         setCompresseurK244DataIsDirty(false);
       })
@@ -472,6 +538,7 @@ const AnalysesLaboratoire = () => {
     setSavingGaz(true);
     saveGazBulk(selectedDate, gazData)
       .then(() => {
+        invalidateCacheByPrefix(cacheKey('gaz', 'day', selectedDate));
         lastSavedGazRef.current = gazData;
         setGazDataIsDirty(false);
       })
@@ -498,6 +565,7 @@ const AnalysesLaboratoire = () => {
     const rowsToSave = mouvementBacsData.map((r) => ({ ...r, bacs: mouvementBacsBacs }));
     saveMouvementBacsBulk(selectedDate, rowsToSave)
       .then((updated) => {
+        invalidateCacheByPrefix(cacheKey('mouvement-des-bacs', 'day', selectedDate));
         lastSavedMouvementBacsRef.current = updated;
         setMouvementBacsData(updated);
         setMouvementBacsBacs(updated[0]?.bacs ?? {});
@@ -531,21 +599,21 @@ const AnalysesLaboratoire = () => {
     isAtmMeroxPreFlash;
 
   const cardTitle = isReformateur
-    ? 'Tableau — Réformateur catalytique'
+    ? `Tableau — ${getFeuilleTitle('reformateur-catalytique')}`
     : isMouvementDesBacs
-      ? 'Tableau — Mouvement des bacs'
+      ? `Tableau — ${getFeuilleTitle('mouvement-des-bacs')}`
       : isProduction
-        ? 'Tableau — Production'
+        ? `Tableau — ${getFeuilleTitle('production-valeur-electricite')}`
         : isGaz
-          ? 'Tableau — Gaz'
+          ? `Tableau — ${getFeuilleTitle('gaz')}`
           : isCompresseurK245
-            ? 'Tableau — Compresseur K 245'
+            ? `Tableau — ${getFeuilleTitle('compresseur-k245')}`
             : isCompresseurK244
-              ? 'Tableau — Compresseur K 244'
+              ? `Tableau — ${getFeuilleTitle('compresseur-k244')}`
               : isAtmMeroxPreFlash
-                ? 'Tableau — Atm/merox & pré flash'
+                ? `Tableau — ${getFeuilleTitle('atm-merox-preflash')}`
                 : selectedTableau === TABLEAU_FILTER_OPTIONS[0]
-                  ? 'Tableau — Analyses du laboratoire'
+                  ? `Tableau — ${getFeuilleTitle('analyses-laboratoire')}`
                   : `Tableau — ${selectedTableau}`;
 
   const filterTriggerClass =
@@ -591,7 +659,7 @@ const AnalysesLaboratoire = () => {
         saving={savingReformateur}
         showValidateButton={reformateurDataIsDirty}
         lastSavedData={lastSavedReformateurRef.current}
-        sectionTitle="Tableau — Réformateur catalytique"
+        sectionTitle={`Tableau — ${getFeuilleTitle('reformateur-catalytique')}`}
         showInlineDate
       />
     </div>
@@ -609,7 +677,7 @@ const AnalysesLaboratoire = () => {
         showValidateButton={mouvementBacsDataIsDirty}
         bacTypesOptions={bacTypesOptions}
         lastSavedData={lastSavedMouvementBacsRef.current}
-        sectionTitle="Tableau — Mouvement des bacs"
+        sectionTitle={`Tableau — ${getFeuilleTitle('mouvement-des-bacs')}`}
         showInlineDate
       />
     </div>
@@ -625,7 +693,7 @@ const AnalysesLaboratoire = () => {
         saving={savingProduction}
         showValidateButton={productionDataIsDirty}
         lastSavedData={lastSavedProductionRef.current}
-        sectionTitle="Tableau — Production"
+        sectionTitle={`Tableau — ${getFeuilleTitle('production-valeur-electricite')}`}
         showInlineDate
       />
     </div>
@@ -641,7 +709,7 @@ const AnalysesLaboratoire = () => {
         saving={savingGaz}
         showValidateButton={gazDataIsDirty}
         lastSavedData={lastSavedGazRef.current}
-        sectionTitle="Tableau — Gaz"
+        sectionTitle={`Tableau — ${getFeuilleTitle('gaz')}`}
         showInlineDate
       />
     </div>
@@ -657,7 +725,7 @@ const AnalysesLaboratoire = () => {
         saving={savingCompresseurK245}
         showValidateButton={compresseurK245DataIsDirty}
         lastSavedData={lastSavedCompresseurK245Ref.current}
-        sectionTitle="Tableau — Compresseur K 245"
+        sectionTitle={`Tableau — ${getFeuilleTitle('compresseur-k245')}`}
         showInlineDate
       />
     </div>
@@ -673,7 +741,7 @@ const AnalysesLaboratoire = () => {
         saving={savingCompresseurK244}
         showValidateButton={compresseurK244DataIsDirty}
         lastSavedData={lastSavedCompresseurK244Ref.current}
-        sectionTitle="Tableau — Compresseur K 244"
+        sectionTitle={`Tableau — ${getFeuilleTitle('compresseur-k244')}`}
         showInlineDate
       />
     </div>
@@ -689,12 +757,12 @@ const AnalysesLaboratoire = () => {
         saving={savingAtmMerox}
         showValidateButton={atmMeroxDataIsDirty}
         lastSavedData={lastSavedAtmMeroxRef.current}
-        sectionTitle="Tableau — Atm/merox & pré flash"
+        sectionTitle={`Tableau — ${getFeuilleTitle('atm-merox-preflash')}`}
         showInlineDate
       />
     </div>
   ) : (
-    <TableAnalysesLaboratoire data={data} onDataChange={handleAnalysesDataChange} selectedDate={selectedDate} onDateChange={setSelectedDate} loading={loadingAnalyses} onValidate={handleAnalysesValidate} saving={savingAnalyses} showValidateButton={analysesDataIsDirty} lastSavedData={lastSavedAnalysesRef.current} sectionTitle="Tableau — Analyses du laboratoire" showInlineDate />
+    <TableAnalysesLaboratoire data={data} onDataChange={handleAnalysesDataChange} selectedDate={selectedDate} onDateChange={setSelectedDate} loading={loadingAnalyses} onValidate={handleAnalysesValidate} saving={savingAnalyses} showValidateButton={analysesDataIsDirty} lastSavedData={lastSavedAnalysesRef.current} sectionTitle={`Tableau — ${getFeuilleTitle('analyses-laboratoire')}`} showInlineDate />
   );
 
 
@@ -716,7 +784,7 @@ const AnalysesLaboratoire = () => {
                 saving={savingReformateur}
                 showValidateButton={reformateurDataIsDirty}
                 lastSavedData={lastSavedReformateurRef.current}
-                sectionTitle="Tableau — Réformateur catalytique"
+                sectionTitle={`Tableau — ${getFeuilleTitle('reformateur-catalytique')}`}
               />
             </div>
           </div>
@@ -736,7 +804,7 @@ const AnalysesLaboratoire = () => {
                 saving={savingProduction}
                 showValidateButton={productionDataIsDirty}
                 lastSavedData={lastSavedProductionRef.current}
-                sectionTitle="Tableau — Production"
+                sectionTitle={`Tableau — ${getFeuilleTitle('production-valeur-electricite')}`}
               />
             </div>
           </div>
@@ -756,7 +824,7 @@ const AnalysesLaboratoire = () => {
                 saving={savingGaz}
                 showValidateButton={gazDataIsDirty}
                 lastSavedData={lastSavedGazRef.current}
-                sectionTitle="Tableau — Gaz"
+                sectionTitle={`Tableau — ${getFeuilleTitle('gaz')}`}
               />
             </div>
           </div>
@@ -778,7 +846,7 @@ const AnalysesLaboratoire = () => {
                 showValidateButton={mouvementBacsDataIsDirty}
                 bacTypesOptions={bacTypesOptions}
                 lastSavedData={lastSavedMouvementBacsRef.current}
-                sectionTitle="Tableau — Mouvement des bacs"
+                sectionTitle={`Tableau — ${getFeuilleTitle('mouvement-des-bacs')}`}
               />
             </div>
           </div>
@@ -798,7 +866,7 @@ const AnalysesLaboratoire = () => {
                 saving={savingAtmMerox}
                 showValidateButton={atmMeroxDataIsDirty}
                 lastSavedData={lastSavedAtmMeroxRef.current}
-                sectionTitle="Tableau — Atm/merox & pré flash"
+                sectionTitle={`Tableau — ${getFeuilleTitle('atm-merox-preflash')}`}
               />
             </div>
           </div>
@@ -818,7 +886,7 @@ const AnalysesLaboratoire = () => {
                 saving={savingCompresseurK245}
                 showValidateButton={compresseurK245DataIsDirty}
                 lastSavedData={lastSavedCompresseurK245Ref.current}
-                sectionTitle="Tableau — Compresseur K 245"
+                sectionTitle={`Tableau — ${getFeuilleTitle('compresseur-k245')}`}
               />
             </div>
           </div>
@@ -838,7 +906,7 @@ const AnalysesLaboratoire = () => {
                 saving={savingCompresseurK244}
                 showValidateButton={compresseurK244DataIsDirty}
                 lastSavedData={lastSavedCompresseurK244Ref.current}
-                sectionTitle="Tableau — Compresseur K 244"
+                sectionTitle={`Tableau — ${getFeuilleTitle('compresseur-k244')}`}
               />
             </div>
           </div>
@@ -858,7 +926,7 @@ const AnalysesLaboratoire = () => {
               showValidateButton={analysesDataIsDirty}
               lastSavedData={lastSavedAnalysesRef.current}
               allRowsVisible
-              sectionTitle="Tableau — Analyses du laboratoire"
+              sectionTitle={`Tableau — ${getFeuilleTitle('analyses-laboratoire')}`}
             />
           </div>
         </div>

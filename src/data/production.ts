@@ -22,7 +22,7 @@ export const PRODUCTION_CATEGORIES: CategoryData[] = [
   { category: 'production electrique', subRows: ['Charge', 'Intensité', 'Fréquence', 'S1', 'S2', 'S3', 'S4', 'S5', 'J351', 'J352', 'J355'] },
 ];
 
-export const PRODUCTION_HOURS = ['h7', 'h11', 'h15', 'h19', 'h23', 'h3'] as const;
+export const PRODUCTION_HOURS = ['h3', 'h7', 'h11', 'h15', 'h19', 'h23'] as const;
 export type ProductionHourKey = (typeof PRODUCTION_HOURS)[number];
 
 export const productionHourLabels: Record<ProductionHourKey, string> = {

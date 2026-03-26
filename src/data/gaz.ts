@@ -8,7 +8,7 @@ export const GAZ_COLUMNS = [
 
 export type GazColumnKey = (typeof GAZ_COLUMNS)[number]['key'];
 
-export const GAZ_HOURS = ['7h', '11h', '15h', '19h', '23h', '03h'] as const;
+export const GAZ_HOURS = ['03h', '7h', '11h', '15h', '19h', '23h'] as const;
 export type GazHourKey = (typeof GAZ_HOURS)[number];
 
 export interface HourRow {

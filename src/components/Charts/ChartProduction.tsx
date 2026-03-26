@@ -10,6 +10,7 @@ import {
 import { DURATION_LABELS, type DurationFilter } from './ChartAnalysesLaboratoire';
 import useColorMode from '../../hooks/useColorMode';
 import { useProductionBounds } from '../../context/ProductionBoundsContext';
+import { useRenommage } from '../../context/RenommageContext';
 
 const WEEK_DAY_LABELS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'] as const;
 const MONTH_NAMES = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'] as const;
@@ -21,6 +22,34 @@ function parseValue(s: string): number {
 
 function formatYAxisLabel(val: number): string {
   return Number.isFinite(val) ? Number(val.toFixed(2)).toString() : '';
+}
+
+/** Tooltip dont la couleur du marqueur reflète la conformité du point. */
+function buildTooltipCustom(
+  outOfBoundsIndices: number[],
+  categories: string[],
+  conformeColor = '#3c50e0',
+  oobColor = '#DC2626',
+  conformeIndices?: number[],
+) {
+  return ({ seriesIndex, dataPointIndex, w }: { seriesIndex: number; dataPointIndex: number; w: any }) => {
+    if (conformeIndices !== undefined) {
+      const hasData = outOfBoundsIndices.includes(dataPointIndex) || conformeIndices.includes(dataPointIndex);
+      if (!hasData) return '<div style="display:none"></div>';
+    }
+    const val: number = w.globals.series[seriesIndex]?.[dataPointIndex] ?? 0;
+    const isOob = outOfBoundsIndices.includes(dataPointIndex);
+    const color = isOob ? oobColor : conformeColor;
+    const formatted = formatYAxisLabel(val);
+    const catLabel = categories[dataPointIndex] ?? '';
+    return (
+      `<div class="apexcharts-tooltip-title" style="font-size:12px;padding:4px 10px;">${catLabel}</div>` +
+      `<div style="display:flex;align-items:center;padding:5px 10px;font-size:13px;">` +
+      `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:8px;flex-shrink:0;"></span>` +
+      `<span>${formatted}</span>` +
+      `</div>`
+    );
+  };
 }
 
 function formatDateLabel(ymd: string): string {
@@ -271,6 +300,7 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
   yearProductionData,
 }) => {
   const { isOutOfBounds } = useProductionBounds();
+  const { getFieldLabel } = useRenommage();
   const [colorMode] = useColorMode();
   const isDay = duration === 'day';
   const isWeek = duration === 'week';
@@ -291,7 +321,7 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
                 ? formatMonthLabel(selectedMonthProp)
                 : `${MONTH_NAMES[new Date().getMonth()]} ${new Date().getFullYear()}`;
 
-  const indicateurLabel = indicateurOptions.find((o) => o.key === selectedIndicateur)?.label ?? selectedIndicateur;
+  const indicateurLabel = getFieldLabel('production-valeur-electricite', selectedIndicateur, indicateurOptions.find((o) => o.key === selectedIndicateur)?.label ?? selectedIndicateur);
 
   const chartData = useMemo(() => {
     if (duration === 'week') {
@@ -412,9 +442,7 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
     };
   }, [data, duration, selectedIndicateur, indicateurLabel, selectedMonthProp, selectedQuarterProp, selectedSemesterProp, selectedYearProp, weekProductionData, monthProductionData, quarterProductionData, semesterProductionData, yearProductionData, isOutOfBounds]);
 
-  const isDarkMode =
-    typeof document !== 'undefined' &&
-    document.documentElement.classList.contains('dark');
+  const isDarkMode = colorMode === 'dark';
 
   const options: ApexOptions = useMemo(() => {
     const hourColorsArr = PRODUCTION_HOURS.map((h) => HOUR_COLORS[h as keyof typeof HOUR_COLORS]);
@@ -557,13 +585,7 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
           max: (max: number) => max * 1.1,
           labels: { minWidth: 50, style: { fontSize: '11px' }, formatter: formatYAxisLabel },
         },
-        tooltip: {
-          x: {
-            formatter: (_val: string, opts?: { dataPointIndex?: number }) =>
-              chartData.categories[opts?.dataPointIndex ?? 0] ?? '',
-          },
-          y: { formatter: (val: number) => formatYAxisLabel(val) },
-        },
+        tooltip: { custom: buildTooltipCustom(outOfBoundsIndices, categoriesWeek, '#3c50e0', '#DC2626', conformeIndices) },
       };
     }
 
@@ -666,13 +688,7 @@ const ChartProduction: React.FC<ChartProductionProps> = ({
           max: (max: number) => max * 1.1,
           labels: { minWidth: 50, style: { fontSize: '11px' }, formatter: formatYAxisLabel },
         },
-        tooltip: {
-          x: {
-            formatter: (_val: string, opts?: { dataPointIndex?: number }) =>
-              chartData.categories[opts?.dataPointIndex ?? 0] ?? '',
-          },
-          y: { formatter: (val: number) => formatYAxisLabel(val) },
-        },
+        tooltip: { custom: buildTooltipCustom(outOfBoundsIndices, categoriesMonth, '#3c50e0', '#DC2626', conformeIndices) },
       };
     }
 

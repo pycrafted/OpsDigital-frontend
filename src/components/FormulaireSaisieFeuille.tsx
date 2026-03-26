@@ -64,7 +64,7 @@ const HOUR_LABELS: Record<string, string> = {
   '04h': '04h',
 };
 
-/** Pour l’affichage : "15.0" → "15", "15.2" → "15.2" (sans .0 inutile). */
+/** Pour l'affichage : "15.0" → "15", "15.2" → "15.2" (sans .0 inutile). */
 function formatDisplayValue(val: string): string {
   if (val === '' || val == null) return '';
   const n = parseFloat(String(val).replace(',', '.'));
@@ -82,6 +82,16 @@ interface FormulaireSaisieFeuilleProps {
   disableAutoFocus?: boolean;
   /** Masque le trait séparateur au-dessus (premier formulaire de la liste). */
   hideSeparator?: boolean;
+  /** Mode édition admin : affiche les icônes de visibilité. */
+  editMode?: boolean;
+  /** Visibilité actuelle du tableau (mode édition). */
+  feuilleVisible?: boolean;
+  /** Bascule la visibilité du tableau (mode édition). */
+  onToggleFeuille?: () => void;
+  /** Retourne si un champ est visible (mode édition). */
+  isFieldVisibleFn?: (fieldKey: string) => boolean;
+  /** Bascule la visibilité d'un champ (mode édition). */
+  onToggleField?: (fieldKey: string) => void;
 }
 
 const LABELS_K244: Record<string, string> = {
@@ -112,6 +122,11 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
   externalHour,
   disableAutoFocus = false,
   hideSeparator = false,
+  editMode = false,
+  feuilleVisible = true,
+  onToggleFeuille,
+  isFieldVisibleFn,
+  onToggleField,
 }) => {
   const { getFeuilleTitle, getCategoryLabel, getFieldLabel } = useRenommage();
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -128,7 +143,7 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
   const [isDirty, setIsDirty] = useState(false);
   const [savingBackend, setSavingBackend] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
-  /** Clé du champ en cours d’édition : on affiche la valeur brute pour permettre de saisir "14.5" (le point). */
+  /** Clé du champ en cours d'édition : on affiche la valeur brute pour permettre de saisir "14.5" (le point). */
   const [focusedFieldKey, setFocusedFieldKey] = useState<string | null>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
   const [reformateurRows, setReformateurRows] = useState<ReformateurHourRow[] | null>(null);
@@ -950,9 +965,28 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <span className="block h-6 w-1 shrink-0 rounded-full bg-primary" aria-hidden />
-              <p className="text-base font-semibold text-primary dark:text-white">
+              <p className={`text-base font-semibold text-primary dark:text-white ${editMode && !feuilleVisible ? 'opacity-40 line-through' : ''}`}>
                 {externalDate ? pageTitle : `Saisie — ${pageTitle}`}
               </p>
+              {editMode && (
+                <button
+                  type="button"
+                  onClick={onToggleFeuille}
+                  title={feuilleVisible ? 'Masquer ce tableau' : 'Afficher ce tableau'}
+                  className={`flex items-center justify-center rounded p-1 transition hover:bg-black/5 dark:hover:bg-white/10 ${feuilleVisible ? 'text-primary dark:text-white' : 'text-bodydark2 dark:text-strokedark'}`}
+                >
+                  {feuilleVisible ? (
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                    </svg>
+                  )}
+                </button>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-3">
               {!externalDate && (
@@ -1038,20 +1072,41 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
               const label = getFieldLabel(feuille.id, key, defaultLabel);
               const rawValue = values[key] ?? '';
               const isFocused = focusedFieldKey === key;
-              /** Au focus : afficher la valeur formatée ("56" pas "56.0"), sauf si l’utilisateur tape une décimale (ex. "14."). */
               const isTypingDecimal = rawValue.endsWith('.') || rawValue.endsWith(',');
               const displayValue = isFocused && isTypingDecimal ? rawValue : formatDisplayValue(rawValue);
+              const fieldVisible = isFieldVisibleFn ? isFieldVisibleFn(key) : true;
               return (
                 <div
                   key={key}
-                  className="flex flex-col sm:flex-row sm:items-center gap-1"
+                  className={`flex flex-col sm:flex-row sm:items-center gap-1 ${editMode && !fieldVisible ? 'opacity-40' : ''}`}
                 >
-                  <label
-                    htmlFor={key}
-                    className="sm:w-44 shrink-0 text-sm font-medium text-[#3c50e0] dark:text-white"
-                  >
-                    {label}
-                  </label>
+                  <div className="flex items-center gap-1 sm:w-44 shrink-0">
+                    {editMode && (
+                      <button
+                        type="button"
+                        onClick={() => onToggleField?.(key)}
+                        title={fieldVisible ? 'Masquer ce champ' : 'Afficher ce champ'}
+                        className={`flex items-center justify-center rounded p-0.5 transition hover:bg-black/5 dark:hover:bg-white/10 ${fieldVisible ? 'text-primary dark:text-white' : 'text-bodydark2 dark:text-strokedark'}`}
+                      >
+                        {fieldVisible ? (
+                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        ) : (
+                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                          </svg>
+                        )}
+                      </button>
+                    )}
+                    <label
+                      htmlFor={key}
+                      className={`text-sm font-medium text-[#3c50e0] dark:text-white ${editMode && !fieldVisible ? 'line-through' : ''}`}
+                    >
+                      {label}
+                    </label>
+                  </div>
                   <input
                     ref={idx === 0 ? firstInputRef : undefined}
                     id={key}
@@ -1062,7 +1117,8 @@ const FormulaireSaisieFeuille: React.FC<FormulaireSaisieFeuilleProps> = ({
                     onChange={(e) => handleChange(key, e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter' && isDirty) { e.preventDefault(); handleSave(); } }}
                     placeholder="—"
-                    className="w-full sm:max-w-xs rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow outline-none placeholder:text-primary/40 focus:ring-2 focus:ring-primary/20 dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white dark:placeholder:text-white/40"
+                    disabled={editMode}
+                    className="w-full sm:max-w-xs rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow outline-none placeholder:text-primary/40 focus:ring-2 focus:ring-primary/20 dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white dark:placeholder:text-white/40 disabled:cursor-default disabled:opacity-60"
                   />
                 </div>
               );

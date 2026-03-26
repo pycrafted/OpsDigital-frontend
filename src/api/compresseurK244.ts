@@ -43,6 +43,27 @@ export async function fetchCompresseurK244ByDateRange(
 }
 
 /**
+ * Télécharge le tableau Compresseur K 244 sur une plage de dates en format Excel (.xlsx).
+ * Un onglet par jour dans le fichier généré.
+ */
+export async function exportCompresseurK244Excel(start: string, end: string): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/api/compresseur-k244/export-excel/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+    { headers: getAuthHeaders() },
+  );
+  if (!res.ok) {
+    throw new Error(`Erreur export: ${res.status}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `compresseur_k244_${start}_${end}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
  * Enregistre toutes les lignes pour une date (bulk).
  */
 export async function saveCompresseurK244Bulk(

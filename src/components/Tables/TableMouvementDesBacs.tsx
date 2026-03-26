@@ -1,8 +1,12 @@
 import React from 'react';
 import { useMouvementBacsLabels } from '../../context/MouvementBacsLabelsContext';
+import { useRenommage } from '../../context/RenommageContext';
 import { useMouvementBacsBounds } from '../../context/MouvementBacsBoundsContext';
 import { useTableView } from '../../context/TableViewContext';
 import type { MouvementBacsHourKey } from '../../data/mouvementDesBacs';
+import { fetchTableSettings, saveTableSettings } from '../../api/tableSettings';
+
+const FEUILLE_ID = "mouvement-des-bacs";
 
 const columns = [
   'naphta sesulf',
@@ -22,7 +26,7 @@ const columns = [
   'go de tete',
 ] as const;
 
-const rows = ['8h', '12h', '16h', '20h', '00h', '04h'] as const;
+const rows = ['04h', '8h', '12h', '16h', '20h', '00h'] as const;
 
 /** Types de bac pour le stockage (sélection par produit) */
 const BAC_TYPES = ['—', 'T 543', 'T 544'] as const;
@@ -112,9 +116,79 @@ const TableMouvementDesBacs = ({
   sectionTitle,
   showInlineDate = false,
 }: TableMouvementDesBacsProps) => {
-  const { getHourLabel, getProductLabel } = useMouvementBacsLabels();
+  const { getHourLabel, getProductLabel: _getProduct } = useMouvementBacsLabels();
+  const { getFieldLabel } = useRenommage();
+  const getProductLabel = (product: string) => getFieldLabel('mouvement-des-bacs', product, _getProduct(product));
   const { isOutOfBounds } = useMouvementBacsBounds();
   const { hideEmptyColumns, canEdit } = useTableView();
+
+  // --- Drag & drop column order ---
+  type DragState = { key: string } | null;
+  type DropTarget = { key: string; side: "left" | "right" } | null;
+
+  const defaultColOrder = [...columns] as string[];
+  const [columnOrder, setColumnOrder] = React.useState<string[]>(defaultColOrder);
+  const saveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragStateRef = React.useRef<DragState>(null);
+  const [dropTarget, setDropTarget] = React.useState<DropTarget>(null);
+
+  React.useEffect(() => {
+    fetchTableSettings(FEUILLE_ID).then((s) => {
+      if (Array.isArray(s["column_order"])) setColumnOrder(s["column_order"] as string[]);
+      else {
+        try { const v = localStorage.getItem("bacs_column_order"); if (v) setColumnOrder(JSON.parse(v) as string[]); } catch (_) {}
+      }
+    }).catch((_) => {
+      try { const v = localStorage.getItem("bacs_column_order"); if (v) setColumnOrder(JSON.parse(v) as string[]); } catch (_2) {}
+    });
+  }, []);
+
+  function scheduleSave(order: string[]) {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      localStorage.setItem("bacs_column_order", JSON.stringify(order));
+      saveTableSettings(FEUILLE_ID, { column_order: order }).catch((_) => {});
+    }, 800);
+  }
+
+  function getSide(e: React.DragEvent<HTMLTableCellElement>): "left" | "right" {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    return e.clientX < rect.left + rect.width / 2 ? "left" : "right";
+  }
+
+  function handleColDragStart(e: React.DragEvent<HTMLTableCellElement>, key: string) {
+    dragStateRef.current = { key };
+    e.dataTransfer.effectAllowed = "move";
+  }
+  function handleColDragOver(e: React.DragEvent<HTMLTableCellElement>, key: string) {
+    e.preventDefault();
+    if (!dragStateRef.current) return;
+    setDropTarget({ key, side: getSide(e) });
+  }
+  function handleColDrop(e: React.DragEvent<HTMLTableCellElement>, toKey: string) {
+    e.preventDefault();
+    const ds = dragStateRef.current;
+    if (!ds || ds.key === toKey) { setDropTarget(null); return; }
+    const side = getSide(e);
+    const arr = [...columnOrder];
+    const fromIdx = arr.indexOf(ds.key);
+    if (fromIdx === -1) { setDropTarget(null); return; }
+    arr.splice(fromIdx, 1);
+    let toIdx = arr.indexOf(toKey);
+    if (toIdx === -1) { setDropTarget(null); return; }
+    if (side === "right") toIdx += 1;
+    arr.splice(toIdx, 0, ds.key);
+    setColumnOrder(arr);
+    scheduleSave(arr);
+    setDropTarget(null);
+    dragStateRef.current = null;
+  }
+
+  function clearDrag() {
+    dragStateRef.current = null;
+    setDropTarget(null);
+  }
+  // --- end drag & drop ---
 
   const [internalData, setInternalData] = React.useState(createInitialData);
   const [internalBacs, setInternalBacs] = React.useState<Record<ColumnKey, string>>(createInitialBacTypes);
@@ -167,7 +241,13 @@ const TableMouvementDesBacs = ({
   };
 
   const filteredRows = rows.filter((r) => selectedRows.includes(r));
-  const filteredColumns = columns.filter((c) => selectedColumns.includes(c));
+  const filteredColumns = ([...columns] as ColumnKey[])
+    .filter((c) => selectedColumns.includes(c))
+    .sort((a, b) => {
+      const ai = columnOrder.indexOf(a);
+      const bi = columnOrder.indexOf(b);
+      return (ai === -1 ? 9999 : ai) - (bi === -1 ? 9999 : bi);
+    });
   const visibleColumns = hideEmptyColumns
     ? filteredColumns.filter((col) =>
         filteredRows.some((row) => {
@@ -385,14 +465,24 @@ const TableMouvementDesBacs = ({
                   className="sticky left-0 z-20 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 border-t-0 border-l-0 bg-[#eff6ff] py-1.5 pl-2 pr-2 dark:border-strokedark dark:border-t-0 dark:border-l-0 dark:bg-[#273342]"
                   aria-label=""
                 />
-                {visibleColumns.map((col) => (
-                  <th
-                    key={col}
-                    className="sticky top-0 z-10 min-w-[5.5rem] border-b border-r border-stroke/70 bg-primary py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark"
-                  >
-                    {getProductLabel(col)}
-                  </th>
-                ))}
+                {visibleColumns.map((col) => {
+                  const isDraggingThis = dragStateRef.current?.key === col;
+                  const isDropHere = dropTarget?.key === col;
+                  return (
+                    <th
+                      key={col}
+                      draggable={canEdit}
+                      onDragStart={(e) => handleColDragStart(e, col)}
+                      onDragOver={(e) => handleColDragOver(e, col)}
+                      onDrop={(e) => handleColDrop(e, col)}
+                      onDragEnd={clearDrag}
+                      onDragLeave={() => setDropTarget(null)}
+                      className={`sticky top-0 z-10 min-w-[5.5rem] border-b border-r border-stroke/70 py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark select-none transition-colors ${canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${isDraggingThis ? "bg-[#0d1a47]" : "bg-primary"} ${isDropHere && dropTarget?.side === "left" ? "border-l-[3px] border-l-yellow-300" : ""} ${isDropHere && dropTarget?.side === "right" ? "border-r-[3px] border-r-yellow-300" : ""}`}
+                    >
+                      {getProductLabel(col)}
+                    </th>
+                  );
+                })}
               </tr>
               <tr>
                 <th
@@ -400,26 +490,36 @@ const TableMouvementDesBacs = ({
                 >
                   Type de bac
                 </th>
-                {visibleColumns.map((col) => (
-                  <th
-                    key={col}
-                    className="sticky top-0 z-10 min-w-[6rem] border-b border-r border-stroke/70 bg-primary/95 py-1 px-1.5 dark:border-strokedark"
-                  >
-                    <select
-                      value={bacTypeByProduct[col] ?? bacTypeOptions[0]}
-                      disabled={!canEdit}
-                      onChange={(e) => handleBacTypeChange(col, e.target.value)}
-                      className="w-full rounded border-0 bg-white/95 py-1.5 pl-2 pr-6 text-left text-xs font-medium text-slate-800 shadow-sm outline-none focus:ring-2 focus:ring-white/50 disabled:cursor-default disabled:opacity-90 dark:bg-meta-4 dark:text-white dark:focus:ring-white/30"
-                      title={`Type de bac pour ${col}`}
+                {visibleColumns.map((col) => {
+                  const isDraggingThis = dragStateRef.current?.key === col;
+                  const isDropHere = dropTarget?.key === col;
+                  return (
+                    <th
+                      key={col}
+                      draggable={canEdit}
+                      onDragStart={(e) => handleColDragStart(e, col)}
+                      onDragOver={(e) => handleColDragOver(e, col)}
+                      onDrop={(e) => handleColDrop(e, col)}
+                      onDragEnd={clearDrag}
+                      onDragLeave={() => setDropTarget(null)}
+                      className={`sticky top-0 z-10 min-w-[6rem] border-b border-r border-stroke/70 py-1 px-1.5 dark:border-strokedark transition-colors ${isDraggingThis ? "bg-[#0d1a47]" : "bg-primary/95"} ${isDropHere && dropTarget?.side === "left" ? "border-l-[3px] border-l-yellow-300" : ""} ${isDropHere && dropTarget?.side === "right" ? "border-r-[3px] border-r-yellow-300" : ""}`}
                     >
-                      {bacTypeOptions.map((bac) => (
-                        <option key={bac} value={bac}>
-                          {bac}
-                        </option>
-                      ))}
-                    </select>
-                  </th>
-                ))}
+                      <select
+                        value={bacTypeByProduct[col] ?? bacTypeOptions[0]}
+                        disabled={!canEdit}
+                        onChange={(e) => handleBacTypeChange(col, e.target.value)}
+                        className="w-full rounded border-0 bg-white/95 py-1.5 pl-2 pr-6 text-left text-xs font-medium text-slate-800 shadow-sm outline-none focus:ring-2 focus:ring-white/50 disabled:cursor-default disabled:opacity-90 dark:bg-meta-4 dark:text-white dark:focus:ring-white/30"
+                        title={`Type de bac pour ${col}`}
+                      >
+                        {bacTypeOptions.map((bac) => (
+                          <option key={bac} value={bac}>
+                            {bac}
+                          </option>
+                        ))}
+                      </select>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>

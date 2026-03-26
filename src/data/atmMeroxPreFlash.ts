@@ -71,7 +71,7 @@ export const ATM_MEROX_CATEGORIES: CategoryData[] = [
   { category: '', subRows: ['DEBIT H20 G122'] },
 ];
 
-export const ATM_MEROX_HOURS = ['7h', '11h', '15h', '19h', '23h', '3h'] as const;
+export const ATM_MEROX_HOURS = ['3h', '7h', '11h', '15h', '19h', '23h'] as const;
 export type AtmMeroxHourKey = (typeof ATM_MEROX_HOURS)[number];
 
 export const atmMeroxHourLabels: Record<AtmMeroxHourKey, string> = {

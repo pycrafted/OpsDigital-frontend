@@ -49,7 +49,7 @@ export const REFORMATEUR_CATEGORIES: CategoryData[] = [
   },
 ];
 
-export const REFORMATEUR_HOURS = ['h7', 'h11', 'h15', 'h19', 'h23', 'h3'] as const;
+export const REFORMATEUR_HOURS = ['h3', 'h7', 'h11', 'h15', 'h19', 'h23'] as const;
 export type ReformateurHourKey = (typeof REFORMATEUR_HOURS)[number];
 
 export const reformateurHourLabels: Record<ReformateurHourKey, string> = {

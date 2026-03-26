@@ -1,4 +1,4 @@
-import React, { ReactNode, useEffect, useRef } from 'react';
+import React, { ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import SecondaryNavbar from '../components/SecondaryNavbar/index';
 import { FEUILLES_CONFIG } from '../types/feuilles';
@@ -6,9 +6,38 @@ import { useTableView } from '../context/TableViewContext';
 import { ALL_HOURS, HOUR_LABELS, useSaisieFilter } from '../context/SaisieFilterContext';
 import { useGraphiqueFilter } from '../context/GraphiqueFilterContext';
 import { useTableauxFilter } from '../context/TableauxFilterContext';
+import { useRenommage } from '../context/RenommageContext';
+import { useAuth } from '../context/AuthContext';
+import { usePrefetch } from '../hooks/usePrefetch';
+import { exportProductionExcel } from '../api/production';
+import { exportReformateurExcel } from '../api/reformateur';
+import { exportAtmMeroxExcel } from '../api/atmMerox';
+import { exportCompresseurK244Excel } from '../api/compresseurK244';
+import { exportCompresseurK245Excel } from '../api/compresseurK245';
+import { exportGazExcel } from '../api/gaz';
+import { exportAnalysesLaboratoireExcel } from '../api/analysesLaboratoire';
+import { exportMouvementDesBacsExcel } from '../api/mouvementDesBacs';
+
+const EXPORTABLE_TABLEAUX: { feuilleId: string; label: string; fn: (s: string, e: string) => Promise<void> }[] = [
+  { feuilleId: 'analyses-laboratoire',       label: 'Analyses du laboratoire',  fn: exportAnalysesLaboratoireExcel },
+  { feuilleId: 'production-valeur-electricite', label: 'Production',            fn: exportProductionExcel },
+  { feuilleId: 'reformateur-catalytique',    label: 'Réformateur catalytique',  fn: exportReformateurExcel },
+  { feuilleId: 'atm-merox-preflash',         label: 'Atm/merox & pré flash',    fn: exportAtmMeroxExcel },
+  { feuilleId: 'compresseur-k244',           label: 'Compresseur K 244',        fn: exportCompresseurK244Excel },
+  { feuilleId: 'compresseur-k245',           label: 'Compresseur K 245',        fn: exportCompresseurK245Excel },
+  { feuilleId: 'gaz',                        label: 'Gaz',                      fn: exportGazExcel },
+  { feuilleId: 'mouvement-des-bacs',         label: 'Mouvement des bacs',       fn: exportMouvementDesBacsExcel },
+];
 
 const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
+  usePrefetch();
+  const [isExporting, setIsExporting] = useState(false);
+  const [showExportPanel, setShowExportPanel] = useState(false);
+  const [exportStart, setExportStart] = useState('');
+  const [exportEnd, setExportEnd] = useState('');
+  const [exportSelectedTableaux, setExportSelectedTableaux] = useState<Set<string>>(new Set());
   const { pathname, search } = useLocation();
+  const { isAdmin } = useAuth();
   const { hideEmptyColumns, toggleHideEmptyColumns, canEdit, toggleCanEdit } = useTableView();
   const { date, setDate, hour, setHour, today } = useSaisieFilter();
   const hourIndex = ALL_HOURS.indexOf(hour);
@@ -21,6 +50,7 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
   const _gPrevDur = _gDurations[_gIdx > 0 ? _gIdx - 1 : _gDurations.length - 1];
   const _gNextDur = _gDurations[_gIdx < _gDurations.length - 1 ? _gIdx + 1 : 0];
   const { selectedDate: tableauxDate, setSelectedDate: setTableauxDate, today: tableauxToday } = useTableauxFilter();
+  const { getFeuilleTitle } = useRenommage();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,15 +65,25 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
   const isGraphiquesPage = pathname.startsWith('/graphique');
   const isTableauxPage = pathname === '/tableaux' || pathname.startsWith('/tableaux/');
   const isParametragePage = pathname === '/parametrage';
+  const isProfilePage = pathname === '/profile';
 
-  const PARAMETRAGE_SECTIONS = [
-    { id: 'visibilite-saisie', label: 'Visibilité Saisie' },
-    { id: 'mode-affichage', label: "Mode d'affichage" },
-    { id: 'renommage', label: 'Renommage' },
-    { id: 'tags-ip21', label: 'Tags IP21' },
-  ] as const;
+  const PARAMETRAGE_SECTIONS_ALL = [
+    { id: 'mode-affichage', label: "Mode d'affichage", adminOnly: false },
+    { id: 'renommage', label: 'Renommage', adminOnly: true },
+    { id: 'visibilite-saisie', label: 'Visibilité Saisie', adminOnly: true },
+    { id: 'tags-ip21', label: 'Tags IP21', adminOnly: true },
+    { id: 'bornes', label: 'Bornes min/max', adminOnly: true },
+  ];
+  const PARAMETRAGE_SECTIONS = PARAMETRAGE_SECTIONS_ALL.filter((s) => !s.adminOnly || isAdmin);
 
-  const parametrageSection = new URLSearchParams(search).get('section') ?? 'visibilite-saisie';
+  const PROFILE_SECTIONS_ALL = [
+    { id: 'profil', label: 'Mon profil', adminOnly: false },
+    { id: 'utilisateurs', label: 'Utilisateurs', adminOnly: true },
+  ];
+  const PROFILE_SECTIONS = PROFILE_SECTIONS_ALL.filter((s) => !s.adminOnly || isAdmin);
+
+  const parametrageSection = new URLSearchParams(search).get('section') ?? 'mode-affichage';
+  const profileSection = new URLSearchParams(search).get('section') ?? 'profil';
 
   const SAISIE_IDS: string[] = [];
 
@@ -51,30 +91,30 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
     (a, b) => a.title.localeCompare(b.title, 'fr'),
   );
 
-  const GRAPHIQUE_ROUTES: { path: string; label: string }[] = [
-    { path: '/graphique', label: 'Analyses du laboratoire' },
-    { path: '/graphique/reformateur-catalytique', label: 'Réformateur catalytique' },
-    { path: '/graphique/production', label: 'Production' },
-    { path: '/graphique/mouvement-des-bacs', label: 'Mouvement des bacs' },
-    { path: '/graphique/compresseur-k245', label: 'Compresseur K 245' },
-    { path: '/graphique/compresseur-k244', label: 'Compresseur K 244' },
-    { path: '/graphique/atm-merox-pre-flash', label: 'Atm/merox & pré flash' },
-    { path: '/graphique/gaz', label: 'Gaz' },
+  const GRAPHIQUE_ROUTES: { path: string; label: string; feuilleId: string }[] = [
+    { path: '/graphique', label: 'Analyses du laboratoire', feuilleId: 'analyses-laboratoire' },
+    { path: '/graphique/reformateur-catalytique', label: 'Réformateur catalytique', feuilleId: 'reformateur-catalytique' },
+    { path: '/graphique/production', label: 'Production', feuilleId: 'production-valeur-electricite' },
+    { path: '/graphique/mouvement-des-bacs', label: 'Mouvement des bacs', feuilleId: 'mouvement-des-bacs' },
+    { path: '/graphique/compresseur-k245', label: 'Compresseur K 245', feuilleId: 'compresseur-k245' },
+    { path: '/graphique/compresseur-k244', label: 'Compresseur K 244', feuilleId: 'compresseur-k244' },
+    { path: '/graphique/atm-merox-pre-flash', label: 'Atm/merox & pré flash', feuilleId: 'atm-merox-preflash' },
+    { path: '/graphique/gaz', label: 'Gaz', feuilleId: 'gaz' },
   ];
 
   const graphiqueRoutesOrdered = [...GRAPHIQUE_ROUTES].sort((a, b) =>
     a.label.localeCompare(b.label, 'fr'),
   );
 
-  const TABLEAU_OPTIONS: { label: string }[] = [
-    { label: 'Analyses du laboratoire' },
-    { label: 'Réformateur catalytique' },
-    { label: 'Production' },
-    { label: 'Gaz' },
-    { label: 'Mouvement des bacs' },
-    { label: 'Atm/merox & pré flash' },
-    { label: 'Compresseur K 245' },
-    { label: 'Compresseur K 244' },
+  const TABLEAU_OPTIONS: { label: string; feuilleId: string }[] = [
+    { label: 'Analyses du laboratoire', feuilleId: 'analyses-laboratoire' },
+    { label: 'Réformateur catalytique', feuilleId: 'reformateur-catalytique' },
+    { label: 'Production', feuilleId: 'production-valeur-electricite' },
+    { label: 'Gaz', feuilleId: 'gaz' },
+    { label: 'Mouvement des bacs', feuilleId: 'mouvement-des-bacs' },
+    { label: 'Atm/merox & pré flash', feuilleId: 'atm-merox-preflash' },
+    { label: 'Compresseur K 245', feuilleId: 'compresseur-k245' },
+    { label: 'Compresseur K 244', feuilleId: 'compresseur-k244' },
   ];
 
   const tableauOptionsOrdered = [...TABLEAU_OPTIONS].sort((a, b) =>
@@ -83,6 +123,10 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
 
   const tableauSearch = new URLSearchParams(search).get('tableau');
   const isShowAllTablesPage = isTableauxPage && tableauSearch === 'Tout';
+  const activeTableauLabel = tableauSearch && tableauOptionsOrdered.some(o => o.label === tableauSearch)
+    ? tableauSearch
+    : 'Analyses du laboratoire';
+  const activeFeuilleId = tableauOptionsOrdered.find(o => o.label === activeTableauLabel)?.feuilleId ?? '';
   const isShowAllGraphsPage = pathname === '/graphique/tous';
 
   return (
@@ -209,6 +253,7 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
                     ? tableauSearch
                     : 'Analyses du laboratoire';
                   const activeIdx = tableauOptionsOrdered.findIndex(o => o.label === activeLabel);
+                  const activeOpt = tableauOptionsOrdered[activeIdx];
                   const prevOpt = tableauOptionsOrdered[activeIdx > 0 ? activeIdx - 1 : tableauOptionsOrdered.length - 1];
                   const nextOpt = tableauOptionsOrdered[activeIdx < tableauOptionsOrdered.length - 1 ? activeIdx + 1 : 0];
                   return (
@@ -244,19 +289,19 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
                         <Link
                           to={`/tableaux?tableau=${encodeURIComponent(prevOpt.label)}`}
                           className="rounded-l px-2 py-0.5 text-primary hover:bg-black/5 dark:text-white dark:hover:bg-white/10"
-                          title={prevOpt.label}
+                          title={getFeuilleTitle(prevOpt.feuilleId)}
                         >
                           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                           </svg>
                         </Link>
                         <span className="min-w-[11rem] py-0.5 text-center text-xs font-bold text-primary dark:text-white">
-                          {activeLabel}
+                          {getFeuilleTitle(activeOpt.feuilleId)}
                         </span>
                         <Link
                           to={`/tableaux?tableau=${encodeURIComponent(nextOpt.label)}`}
                           className="rounded-r px-2 py-0.5 text-primary hover:bg-black/5 dark:text-white dark:hover:bg-white/10"
-                          title={nextOpt.label}
+                          title={getFeuilleTitle(nextOpt.feuilleId)}
                         >
                           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -284,19 +329,33 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
                           </svg>
                         )}
                       </button>
+                      {(activeOpt.feuilleId === 'production-valeur-electricite' || activeOpt.feuilleId === 'reformateur-catalytique' || activeOpt.feuilleId === 'atm-merox-preflash' || activeOpt.feuilleId === 'compresseur-k244' || activeOpt.feuilleId === 'compresseur-k245' || activeOpt.feuilleId === 'gaz' || activeOpt.feuilleId === 'analyses-laboratoire' || activeOpt.feuilleId === 'mouvement-des-bacs') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!showExportPanel) {
+                              setExportStart(tableauxDate);
+                              setExportEnd(tableauxDate);
+                            }
+                            setShowExportPanel(prev => !prev);
+                          }}
+                          className={`flex shrink-0 items-center justify-center rounded border px-2 py-1 shadow transition ${
+                            showExportPanel
+                              ? 'border-primary bg-primary text-white hover:bg-primary/90'
+                              : 'border-primary bg-white text-primary dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white hover:bg-primary/10 dark:hover:bg-white/10'
+                          }`}
+                          aria-label="Exporter en Excel"
+                          title="Exporter en Excel (.xlsx)"
+                        >
+                          <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   );
                 })() : (
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                      <input
-                        type="date"
-                        value={tableauxDate}
-                        max={tableauxToday}
-                        onChange={(e) => setTableauxDate(e.target.value)}
-                        className="w-[7.5rem] rounded border-0 bg-transparent py-0.5 text-xs font-bold text-primary outline-none dark:text-white"
-                      />
-                    </div>
                     <button
                       type="button"
                       onClick={toggleHideEmptyColumns}
@@ -320,6 +379,15 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
                         </svg>
                       )}
                     </button>
+                    <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
+                      <input
+                        type="date"
+                        value={tableauxDate}
+                        max={tableauxToday}
+                        onChange={(e) => setTableauxDate(e.target.value)}
+                        className="w-[7.5rem] rounded border-0 bg-transparent py-0.5 text-xs font-bold text-primary outline-none dark:text-white"
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={toggleCanEdit}
@@ -341,11 +409,201 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
                         </svg>
                       )}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!showExportPanel) {
+                          setExportStart(tableauxDate);
+                          setExportEnd(tableauxDate);
+                        }
+                        setShowExportPanel(prev => !prev);
+                      }}
+                      className={`flex shrink-0 items-center justify-center rounded border px-2 py-1 shadow transition ${
+                        showExportPanel
+                          ? 'border-primary bg-primary text-white hover:bg-primary/90'
+                          : 'border-primary bg-white text-primary dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white hover:bg-primary/10 dark:hover:bg-white/10'
+                      }`}
+                      aria-label="Exporter en Excel"
+                      title="Exporter en Excel (.xlsx)"
+                    >
+                      <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                      </svg>
+                    </button>
                   </div>
                 )}
               </div>
               <div />
             </div>
+            {/* Panel export Excel — collé sous la barre */}
+            {/* Panel export Excel — page Tout */}
+            {showExportPanel && isShowAllTablesPage && (
+              <div className="border-t border-stroke bg-white px-4 py-3 dark:border-strokedark dark:bg-[#1e2d3d]">
+                <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-xs font-semibold text-primary dark:text-white">Tableaux à exporter (.xlsx)</span>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {EXPORTABLE_TABLEAUX.map(t => (
+                        <label key={t.feuilleId} className="flex items-center gap-1.5 cursor-pointer select-none text-xs text-bodydark2 dark:text-bodydark hover:text-primary dark:hover:text-white">
+                          <input
+                            type="checkbox"
+                            checked={exportSelectedTableaux.has(t.feuilleId)}
+                            onChange={(e) => {
+                              setExportSelectedTableaux(prev => {
+                                const next = new Set(prev);
+                                e.target.checked ? next.add(t.feuilleId) : next.delete(t.feuilleId);
+                                return next;
+                              });
+                            }}
+                            className="accent-primary"
+                          />
+                          {t.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-bodydark2 dark:text-bodydark">Du</label>
+                      <div className="flex items-center rounded border border-primary bg-[#f0f9ff] px-2 py-1 dark:border-[#313d4a] dark:bg-[#313d4a]">
+                        <input
+                          type="date"
+                          value={exportStart}
+                          max={tableauxToday}
+                          onChange={(e) => setExportStart(e.target.value)}
+                          className="w-[7.5rem] rounded border-0 bg-transparent py-0.5 text-xs font-bold text-primary outline-none dark:text-white"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-bodydark2 dark:text-bodydark">Au</label>
+                      <div className="flex items-center rounded border border-primary bg-[#f0f9ff] px-2 py-1 dark:border-[#313d4a] dark:bg-[#313d4a]">
+                        <input
+                          type="date"
+                          value={exportEnd}
+                          min={exportStart}
+                          max={tableauxToday}
+                          onChange={(e) => setExportEnd(e.target.value)}
+                          className="w-[7.5rem] rounded border-0 bg-transparent py-0.5 text-xs font-bold text-primary outline-none dark:text-white"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isExporting || !exportStart || !exportEnd || exportSelectedTableaux.size === 0}
+                      onClick={() => {
+                        const selected = EXPORTABLE_TABLEAUX.filter(t => exportSelectedTableaux.has(t.feuilleId));
+                        setIsExporting(true);
+                        selected.reduce(
+                          (chain, t) => chain.then(() => t.fn(exportStart, exportEnd)),
+                          Promise.resolve()
+                        ).then(() => setShowExportPanel(false)).finally(() => setIsExporting(false));
+                      }}
+                      className="flex items-center gap-1.5 rounded border border-primary bg-primary px-3 py-1 text-xs font-semibold text-white shadow transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isExporting ? (
+                        <svg className="h-3.5 w-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      ) : (
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                        </svg>
+                      )}
+                      {isExporting ? 'Export en cours…' : `Télécharger${exportSelectedTableaux.size > 0 ? ` (${exportSelectedTableaux.size})` : ''}`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowExportPanel(false)}
+                      className="flex items-center justify-center rounded border border-stroke bg-white px-2 py-1 text-xs text-bodydark2 shadow transition hover:bg-black/5 dark:border-strokedark dark:bg-[#313d4a] dark:text-bodydark dark:hover:bg-white/10"
+                      title="Fermer"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* Panel export Excel — page tableau individuel */}
+            {showExportPanel && !isShowAllTablesPage && (activeFeuilleId === 'production-valeur-electricite' || activeFeuilleId === 'reformateur-catalytique' || activeFeuilleId === 'atm-merox-preflash' || activeFeuilleId === 'compresseur-k244' || activeFeuilleId === 'compresseur-k245' || activeFeuilleId === 'gaz' || activeFeuilleId === 'analyses-laboratoire' || activeFeuilleId === 'mouvement-des-bacs') && (
+              <div className="border-t border-stroke bg-white px-4 py-3 dark:border-strokedark dark:bg-[#1e2d3d]">
+                <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-center gap-3 flex-wrap">
+                  <span className="text-xs font-semibold text-primary dark:text-white">Exporter Production (.xlsx)</span>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-bodydark2 dark:text-bodydark">Du</label>
+                    <div className="flex items-center rounded border border-primary bg-[#f0f9ff] px-2 py-1 dark:border-[#313d4a] dark:bg-[#313d4a]">
+                      <input
+                        type="date"
+                        value={exportStart}
+                        max={tableauxToday}
+                        onChange={(e) => setExportStart(e.target.value)}
+                        className="w-[7.5rem] rounded border-0 bg-transparent py-0.5 text-xs font-bold text-primary outline-none dark:text-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-bodydark2 dark:text-bodydark">Au</label>
+                    <div className="flex items-center rounded border border-primary bg-[#f0f9ff] px-2 py-1 dark:border-[#313d4a] dark:bg-[#313d4a]">
+                      <input
+                        type="date"
+                        value={exportEnd}
+                        min={exportStart}
+                        max={tableauxToday}
+                        onChange={(e) => setExportEnd(e.target.value)}
+                        className="w-[7.5rem] rounded border-0 bg-transparent py-0.5 text-xs font-bold text-primary outline-none dark:text-white"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isExporting || !exportStart || !exportEnd}
+                    onClick={() => {
+                      setIsExporting(true);
+                      const fn = activeFeuilleId === 'reformateur-catalytique'
+                        ? exportReformateurExcel(exportStart, exportEnd)
+                        : activeFeuilleId === 'atm-merox-preflash'
+                          ? exportAtmMeroxExcel(exportStart, exportEnd)
+                          : activeFeuilleId === 'compresseur-k244'
+                            ? exportCompresseurK244Excel(exportStart, exportEnd)
+                            : activeFeuilleId === 'compresseur-k245'
+                              ? exportCompresseurK245Excel(exportStart, exportEnd)
+                              : activeFeuilleId === 'gaz'
+                                ? exportGazExcel(exportStart, exportEnd)
+                                : activeFeuilleId === 'analyses-laboratoire'
+                                  ? exportAnalysesLaboratoireExcel(exportStart, exportEnd)
+                                  : activeFeuilleId === 'mouvement-des-bacs'
+                                    ? exportMouvementDesBacsExcel(exportStart, exportEnd)
+                                    : exportProductionExcel(exportStart, exportEnd);
+                      fn.then(() => setShowExportPanel(false)).finally(() => setIsExporting(false));
+                    }}
+                    className="flex items-center gap-1.5 rounded border border-primary bg-primary px-3 py-1 text-xs font-semibold text-white shadow transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isExporting ? (
+                      <svg className="h-3.5 w-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    ) : (
+                      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                      </svg>
+                    )}
+                    {isExporting ? 'Export en cours…' : 'Télécharger'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowExportPanel(false)}
+                    className="flex items-center justify-center rounded border border-stroke bg-white px-2 py-1 text-xs text-bodydark2 shadow transition hover:bg-black/5 dark:border-strokedark dark:bg-[#313d4a] dark:text-bodydark dark:hover:bg-white/10"
+                    title="Fermer"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -365,19 +623,19 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
                       <Link
                         to={prevRoute.path}
                         className="rounded-l px-2 py-0.5 text-primary hover:bg-black/5 dark:text-white dark:hover:bg-white/10"
-                        title={prevRoute.label}
+                        title={getFeuilleTitle(prevRoute.feuilleId)}
                       >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                         </svg>
                       </Link>
                       <span className="min-w-[11rem] py-0.5 text-center text-xs font-bold text-primary dark:text-white">
-                        {activeRoute.label}
+                        {getFeuilleTitle(activeRoute.feuilleId)}
                       </span>
                       <Link
                         to={nextRoute.path}
                         className="rounded-r px-2 py-0.5 text-primary hover:bg-black/5 dark:text-white dark:hover:bg-white/10"
-                        title={nextRoute.label}
+                        title={getFeuilleTitle(nextRoute.feuilleId)}
                       >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -403,6 +661,29 @@ const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
                     to={`/parametrage?section=${section.id}`}
                     className={`rounded border px-3 py-1 text-xs font-bold shadow transition ${
                       parametrageSection === section.id
+                        ? 'border-primary bg-primary text-white hover:bg-primary/90'
+                        : 'border-primary bg-white text-primary dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white hover:bg-primary/10 dark:hover:bg-white/10'
+                    }`}
+                  >
+                    {section.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* <!-- ===== Navbar secondaire Profil ===== --> */}
+        {isProfilePage && (
+          <div className="z-40 shrink-0 border-b border-stroke bg-[#f0f9ff] dark:border-strokedark dark:bg-[#23303e]">
+            <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-center px-4 py-2 md:px-6 2xl:px-11">
+              <div className="flex items-center gap-2">
+                {PROFILE_SECTIONS.map((section) => (
+                  <Link
+                    key={section.id}
+                    to={`/profile?section=${section.id}`}
+                    className={`rounded border px-3 py-1 text-xs font-bold shadow transition ${
+                      profileSection === section.id
                         ? 'border-primary bg-primary text-white hover:bg-primary/90'
                         : 'border-primary bg-white text-primary dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white hover:bg-primary/10 dark:hover:bg-white/10'
                     }`}

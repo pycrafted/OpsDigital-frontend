@@ -37,7 +37,7 @@ export const COMPRESSEUR_K244_CATEGORIES: CategoryData[] = [
   },
 ];
 
-export const COMPRESSEUR_K244_HOURS = ['h7', 'h11', 'h15', 'h19', 'h23', 'h3'] as const;
+export const COMPRESSEUR_K244_HOURS = ['h3', 'h7', 'h11', 'h15', 'h19', 'h23'] as const;
 export type CompresseurK244HourKey = (typeof COMPRESSEUR_K244_HOURS)[number];
 
 export const compresseurK244HourLabels: Record<CompresseurK244HourKey, string> = {

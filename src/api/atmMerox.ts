@@ -43,6 +43,27 @@ export async function fetchAtmMeroxByDateRange(
 }
 
 /**
+ * Télécharge le tableau Atm/Merox & Pré Flash sur une plage de dates en format Excel (.xlsx).
+ * Un onglet par jour dans le fichier généré.
+ */
+export async function exportAtmMeroxExcel(start: string, end: string): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/api/atm-merox/export-excel/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+    { headers: getAuthHeaders() },
+  );
+  if (!res.ok) {
+    throw new Error(`Erreur export: ${res.status}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `atm_merox_${start}_${end}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
  * Enregistre toutes les lignes pour une date (bulk).
  */
 export async function saveAtmMeroxBulk(

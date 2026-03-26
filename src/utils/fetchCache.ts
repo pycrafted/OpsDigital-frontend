@@ -23,6 +23,11 @@ export function invalidateCacheByPrefix(prefix: string): void {
   }
 }
 
+/** Vide entièrement le cache (à appeler au montage de la page graphique pour éviter les données périmées). */
+export function clearAllCache(): void {
+  store.clear();
+}
+
 export function cacheKey(
   graphType: string,
   duration: string,

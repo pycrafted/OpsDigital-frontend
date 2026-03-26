@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useRenommage } from '../context/RenommageContext';
 import { useLocation } from 'react-router-dom';
 import { useGraphiqueFilter } from '../context/GraphiqueFilterContext';
-import { cacheKey, getCached, invalidateCacheByPrefix, setCached } from '../utils/fetchCache';
+import { cacheKey, clearAllCache, getCached, setCached } from '../utils/fetchCache';
 import ChartAnalysesLaboratoire, { type DurationFilter, type WeekAnalysesData, type MonthAnalysesData } from '../components/Charts/ChartAnalysesLaboratoire';
 import ChartAtmMeroxPreFlash, { type MonthAtmMeroxData } from '../components/Charts/ChartAtmMeroxPreFlash';
 import ChartGaz from '../components/Charts/ChartGaz';
@@ -73,6 +74,10 @@ function getISOWeekString(date: Date): string {
   return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`;
 }
 
+/** Formate une date en YYYY-MM-DD en heure locale (évite le décalage UTC de toISOString) */
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 
 
@@ -96,6 +101,7 @@ const gazIndicateurOptions = getGazIndicateurOptions();
 
 const AnalysesLaboratoireGraphique = () => {
   const { pathname } = useLocation();
+  const { getFeuilleTitle, getFieldLabel } = useRenommage();
   const showAllGraphs = pathname === '/graphique/tous';
   const graphType: GraphType =
     pathname === '/graphique/reformateur-catalytique'
@@ -222,6 +228,39 @@ const AnalysesLaboratoireGraphique = () => {
   const setSelectedMonth = showAllGraphs ? graphiqueCtx.setSelectedMonth : setLocalSelectedMonth;
   const [selectedMeasure, setSelectedMeasure] = useState<string>(() => measureNames[0] ?? ANALYSES_MEASURE_NAMES[0] ?? '');
   const [selectedProduct, setSelectedProduct] = useState<ProductKey>(products[0]);
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const [showMeasureDropdown, setShowMeasureDropdown] = useState(false);
+  const [showReformateurDropdown, setShowReformateurDropdown] = useState(false);
+  const [showProductionDropdown, setShowProductionDropdown] = useState(false);
+  const [showMouvementBacsDropdown, setShowMouvementBacsDropdown] = useState(false);
+  const [showK245Dropdown, setShowK245Dropdown] = useState(false);
+  const [showK244Dropdown, setShowK244Dropdown] = useState(false);
+  const [showAtmMeroxDropdown, setShowAtmMeroxDropdown] = useState(false);
+  const [showGazDropdown, setShowGazDropdown] = useState(false);
+  const productDropdownRef = useRef<HTMLDivElement>(null);
+  const measureDropdownRef = useRef<HTMLDivElement>(null);
+  const reformateurDropdownRef = useRef<HTMLDivElement>(null);
+  const productionDropdownRef = useRef<HTMLDivElement>(null);
+  const mouvementBacsDropdownRef = useRef<HTMLDivElement>(null);
+  const k245DropdownRef = useRef<HTMLDivElement>(null);
+  const k244DropdownRef = useRef<HTMLDivElement>(null);
+  const atmMeroxDropdownRef = useRef<HTMLDivElement>(null);
+  const gazDropdownRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handler = ({ target }: MouseEvent) => {
+      if (productDropdownRef.current && !productDropdownRef.current.contains(target as Node)) setShowProductDropdown(false);
+      if (measureDropdownRef.current && !measureDropdownRef.current.contains(target as Node)) setShowMeasureDropdown(false);
+      if (reformateurDropdownRef.current && !reformateurDropdownRef.current.contains(target as Node)) setShowReformateurDropdown(false);
+      if (productionDropdownRef.current && !productionDropdownRef.current.contains(target as Node)) setShowProductionDropdown(false);
+      if (mouvementBacsDropdownRef.current && !mouvementBacsDropdownRef.current.contains(target as Node)) setShowMouvementBacsDropdown(false);
+      if (k245DropdownRef.current && !k245DropdownRef.current.contains(target as Node)) setShowK245Dropdown(false);
+      if (k244DropdownRef.current && !k244DropdownRef.current.contains(target as Node)) setShowK244Dropdown(false);
+      if (atmMeroxDropdownRef.current && !atmMeroxDropdownRef.current.contains(target as Node)) setShowAtmMeroxDropdown(false);
+      if (gazDropdownRef.current && !gazDropdownRef.current.contains(target as Node)) setShowGazDropdown(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
   const [selectedIndicateur, setSelectedIndicateur] = useState<string>(
     () => reformateurIndicateurOptions[0]?.key ?? ''
   );
@@ -235,10 +274,10 @@ const AnalysesLaboratoireGraphique = () => {
     () => compresseurK245IndicateurOptions[0]?.key ?? ''
   );
   const [selectedK244Indicateur, setSelectedK244Indicateur] = useState<string>(
-    () => compresseurK244IndicateurOptions[0]?.key ?? ''
+    () => compresseurK244IndicateurOptions.find(o => o.key === 'moteur k244_t° eau Mot')?.key ?? compresseurK244IndicateurOptions[0]?.key ?? ''
   );
   const [selectedAtmMeroxIndicateur, setSelectedAtmMeroxIndicateur] = useState<string>(
-    () => atmMeroxIndicateurOptions[0]?.key ?? ''
+    () => atmMeroxIndicateurOptions.find(o => o.key === 'Charge brut_17 FT 001 Débit charge')?.key ?? atmMeroxIndicateurOptions[0]?.key ?? ''
   );
   const [selectedGazIndicateur, setSelectedGazIndicateur] = useState<string>(
     () => gazIndicateurOptions[0]?.key ?? ''
@@ -247,12 +286,12 @@ const AnalysesLaboratoireGraphique = () => {
   // Invalider le cache des analyses pour forcer un rechargement (après modification ailleurs ou au retour sur l’onglet).
   const [analysesCacheVersion, setAnalysesCacheVersion] = useState(0);
   useEffect(() => {
-    invalidateCacheByPrefix('analyses:');
+    clearAllCache();
   }, []);
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
-        invalidateCacheByPrefix('analyses:');
+        clearAllCache();
         setAnalysesCacheVersion((v) => v + 1);
       }
     };
@@ -346,7 +385,7 @@ const AnalysesLaboratoireGraphique = () => {
     for (let i = 0; i < 7; i++) {
       const d = new Date(bounds.start);
       d.setDate(bounds.start.getDate() + i);
-      dates.push(d.toISOString().slice(0, 10));
+      dates.push(localDateStr(d));
     }
 
     const start = dates[0];
@@ -408,7 +447,7 @@ const AnalysesLaboratoireGraphique = () => {
     for (let i = 0; i < 7; i++) {
       const d = new Date(bounds.start);
       d.setDate(bounds.start.getDate() + i);
-      dates.push(d.toISOString().slice(0, 10));
+      dates.push(localDateStr(d));
     }
 
     const start = dates[0];
@@ -595,7 +634,7 @@ const AnalysesLaboratoireGraphique = () => {
     for (let i = 0; i < 7; i++) {
       const d = new Date(bounds.start);
       d.setDate(bounds.start.getDate() + i);
-      dates.push(d.toISOString().slice(0, 10));
+      dates.push(localDateStr(d));
     }
 
     const start = dates[0];
@@ -657,7 +696,7 @@ const AnalysesLaboratoireGraphique = () => {
     for (let i = 0; i < 7; i++) {
       const d = new Date(bounds.start);
       d.setDate(bounds.start.getDate() + i);
-      dates.push(d.toISOString().slice(0, 10));
+      dates.push(localDateStr(d));
     }
 
     const start = dates[0];
@@ -719,7 +758,7 @@ const AnalysesLaboratoireGraphique = () => {
     for (let i = 0; i < 7; i++) {
       const d = new Date(bounds.start);
       d.setDate(bounds.start.getDate() + i);
-      dates.push(d.toISOString().slice(0, 10));
+      dates.push(localDateStr(d));
     }
 
     const start = dates[0];
@@ -781,7 +820,7 @@ const AnalysesLaboratoireGraphique = () => {
     for (let i = 0; i < 7; i++) {
       const d = new Date(bounds.start);
       d.setDate(bounds.start.getDate() + i);
-      dates.push(d.toISOString().slice(0, 10));
+      dates.push(localDateStr(d));
     }
 
     const start = dates[0];
@@ -843,7 +882,7 @@ const AnalysesLaboratoireGraphique = () => {
     for (let i = 0; i < 7; i++) {
       const d = new Date(bounds.start);
       d.setDate(bounds.start.getDate() + i);
-      dates.push(d.toISOString().slice(0, 10));
+      dates.push(localDateStr(d));
     }
 
     const start = dates[0];
@@ -887,7 +926,7 @@ const AnalysesLaboratoireGraphique = () => {
     const dates: string[] = [];
     for (let day = 1; day <= daysInMonth; day++) {
       const d = new Date(year, month - 1, day);
-      dates.push(d.toISOString().slice(0, 10));
+      dates.push(localDateStr(d));
     }
 
     const start = dates[0];
@@ -931,7 +970,7 @@ const AnalysesLaboratoireGraphique = () => {
     const dates: string[] = [];
     for (let day = 1; day <= daysInMonth; day++) {
       const d = new Date(year, month - 1, day);
-      dates.push(d.toISOString().slice(0, 10));
+      dates.push(localDateStr(d));
     }
 
     const start = dates[0];
@@ -975,7 +1014,7 @@ const AnalysesLaboratoireGraphique = () => {
     const dates: string[] = [];
     for (let day = 1; day <= daysInMonth; day++) {
       const d = new Date(year, month - 1, day);
-      dates.push(d.toISOString().slice(0, 10));
+      dates.push(localDateStr(d));
     }
 
     const start = dates[0];
@@ -1023,7 +1062,7 @@ const AnalysesLaboratoireGraphique = () => {
     const dates: string[] = [];
     for (let day = 1; day <= daysInMonth; day++) {
       const d = new Date(year, month - 1, day);
-      dates.push(d.toISOString().slice(0, 10));
+      dates.push(localDateStr(d));
     }
 
     const start = dates[0];
@@ -1067,7 +1106,7 @@ const AnalysesLaboratoireGraphique = () => {
     const dates: string[] = [];
     for (let day = 1; day <= daysInMonth; day++) {
       const d = new Date(year, month - 1, day);
-      dates.push(d.toISOString().slice(0, 10));
+      dates.push(localDateStr(d));
     }
 
     const start = dates[0];
@@ -1111,7 +1150,7 @@ const AnalysesLaboratoireGraphique = () => {
     const dates: string[] = [];
     for (let day = 1; day <= daysInMonth; day++) {
       const d = new Date(year, month - 1, day);
-      dates.push(d.toISOString().slice(0, 10));
+      dates.push(localDateStr(d));
     }
 
     const start = dates[0];
@@ -1155,7 +1194,7 @@ const AnalysesLaboratoireGraphique = () => {
     const dates: string[] = [];
     for (let day = 1; day <= daysInMonth; day++) {
       const d = new Date(year, month - 1, day);
-      dates.push(d.toISOString().slice(0, 10));
+      dates.push(localDateStr(d));
     }
 
     const start = dates[0];
@@ -1254,7 +1293,7 @@ const AnalysesLaboratoireGraphique = () => {
     for (let i = 0; i < 7; i++) {
       const d = new Date(bounds.start);
       d.setDate(bounds.start.getDate() + i);
-      dates.push(d.toISOString().slice(0, 10));
+      dates.push(localDateStr(d));
     }
 
     const start = dates[0];
@@ -1298,7 +1337,7 @@ const AnalysesLaboratoireGraphique = () => {
     const dates: string[] = [];
     for (let day = 1; day <= daysInMonth; day++) {
       const d = new Date(year, month - 1, day);
-      dates.push(d.toISOString().slice(0, 10));
+      dates.push(localDateStr(d));
     }
 
     const start = dates[0];
@@ -1444,35 +1483,63 @@ const AnalysesLaboratoireGraphique = () => {
                     onProductChange={setSelectedProduct}
                     weekAnalysesData={duration === 'week' ? weekAnalysesData ?? undefined : undefined}
                     monthAnalysesData={duration === 'month' ? monthAnalysesData ?? undefined : undefined}
-                    leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">Graphique — Analyses du laboratoire</p>}
+                    leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">{`Graphique — ${getFeuilleTitle('analyses-laboratoire')}`}</p>}
                     centerSlot={dateControls}
                     rightSlot={(
                       <>
-                        <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                          <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Produit</span>
-                          <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                          <select
-                            value={selectedProduct}
-                            onChange={(e) => setSelectedProduct(e.target.value as ProductKey)}
-                            className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
+                        <div className="relative" ref={productDropdownRef}>
+                          <button
+                            type="button"
+                            onClick={() => setShowProductDropdown(!showProductDropdown)}
+                            className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white"
                           >
-                            {products.map((p) => (
-                              <option key={p} value={p}>{productLabels[p]}</option>
-                            ))}
-                          </select>
+                            Produit
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showProductDropdown ? 'rotate-180' : ''}`} aria-hidden>
+                              <path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" />
+                            </svg>
+                          </button>
+                          {showProductDropdown && (
+                            <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                              {products.map((p) => (
+                                <button
+                                  key={p}
+                                  type="button"
+                                  onClick={() => { setSelectedProduct(p as ProductKey); setShowProductDropdown(false); }}
+                                  className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedProduct === p ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}
+                                >
+                                  {selectedProduct === p && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                                  {productLabels[p]}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                          <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Mesure</span>
-                          <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                          <select
-                            value={selectedMeasure}
-                            onChange={(e) => setSelectedMeasure(e.target.value)}
-                            className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
+                        <div className="relative" ref={measureDropdownRef}>
+                          <button
+                            type="button"
+                            onClick={() => setShowMeasureDropdown(!showMeasureDropdown)}
+                            className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white"
                           >
-                            {measureNames.map((m) => (
-                              <option key={m} value={m}>{m}</option>
-                            ))}
-                          </select>
+                            Mesure
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showMeasureDropdown ? 'rotate-180' : ''}`} aria-hidden>
+                              <path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" />
+                            </svg>
+                          </button>
+                          {showMeasureDropdown && (
+                            <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                              {measureNames.map((m) => (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => { setSelectedMeasure(m); setShowMeasureDropdown(false); }}
+                                  className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedMeasure === m ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}
+                                >
+                                  {selectedMeasure === m && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                                  {m}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </>
                     )}
@@ -1518,21 +1585,24 @@ const AnalysesLaboratoireGraphique = () => {
                     embedded={false}
                     weekReformateurData={duration === 'week' ? weekReformateurData ?? undefined : undefined}
                     monthReformateurData={duration === 'month' ? monthReformateurData ?? undefined : undefined}
-                    leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">Graphique — Réformateur catalytique</p>}
+                    leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">{`Graphique — ${getFeuilleTitle('reformateur-catalytique')}`}</p>}
                     centerSlot={dateControls}
                     rightSlot={(
-                      <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                        <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Indicateur</span>
-                        <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                        <select
-                          value={selectedIndicateur}
-                          onChange={(e) => setSelectedIndicateur(e.target.value)}
-                          className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
-                        >
-                          {reformateurIndicateurOptions.map((opt) => (
-                            <option key={opt.key} value={opt.key}>{opt.label}</option>
-                          ))}
-                        </select>
+                      <div className="relative" ref={reformateurDropdownRef}>
+                        <button type="button" onClick={() => setShowReformateurDropdown(!showReformateurDropdown)} className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white">
+                          Indicateur
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showReformateurDropdown ? 'rotate-180' : ''}`} aria-hidden><path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" /></svg>
+                        </button>
+                        {showReformateurDropdown && (
+                          <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                            {reformateurIndicateurOptions.map((opt) => (
+                              <button key={opt.key} type="button" onClick={() => { setSelectedIndicateur(opt.key); setShowReformateurDropdown(false); }} className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedIndicateur === opt.key ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}>
+                                {selectedIndicateur === opt.key && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                                {getFieldLabel('reformateur-catalytique', opt.key, opt.label)}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   />
@@ -1569,21 +1639,24 @@ const AnalysesLaboratoireGraphique = () => {
                     embedded={false}
                     weekProductionData={duration === 'week' ? weekProductionData ?? undefined : undefined}
                     monthProductionData={duration === 'month' ? monthProductionData ?? undefined : undefined}
-                    leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">Graphique — Production</p>}
+                    leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">{`Graphique — ${getFeuilleTitle('production-valeur-electricite')}`}</p>}
                     centerSlot={dateControls}
                     rightSlot={(
-                      <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                        <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Indicateur</span>
-                        <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                        <select
-                          value={selectedProductionIndicateur}
-                          onChange={(e) => setSelectedProductionIndicateur(e.target.value)}
-                          className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
-                        >
-                          {productionIndicateurOptions.map((opt) => (
-                            <option key={opt.key} value={opt.key}>{opt.label}</option>
-                          ))}
-                        </select>
+                      <div className="relative" ref={productionDropdownRef}>
+                        <button type="button" onClick={() => setShowProductionDropdown(!showProductionDropdown)} className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white">
+                          Indicateur
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showProductionDropdown ? 'rotate-180' : ''}`} aria-hidden><path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" /></svg>
+                        </button>
+                        {showProductionDropdown && (
+                          <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                            {productionIndicateurOptions.map((opt) => (
+                              <button key={opt.key} type="button" onClick={() => { setSelectedProductionIndicateur(opt.key); setShowProductionDropdown(false); }} className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedProductionIndicateur === opt.key ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}>
+                                {selectedProductionIndicateur === opt.key && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                                {getFieldLabel('production-valeur-electricite', opt.key, opt.label)}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   />
@@ -1620,21 +1693,24 @@ const AnalysesLaboratoireGraphique = () => {
                     weekMouvementBacsData={duration === 'week' ? weekMouvementBacsData ?? undefined : undefined}
                     monthMouvementBacsData={duration === 'month' ? monthMouvementBacsData ?? undefined : undefined}
                     embedded={false}
-                    leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">Graphique — Mouvement des bacs</p>}
+                    leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">{`Graphique — ${getFeuilleTitle('mouvement-des-bacs')}`}</p>}
                     centerSlot={dateControls}
                     rightSlot={(
-                      <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                        <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Produit</span>
-                        <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                        <select
-                          value={selectedMouvementBacsIndicateur}
-                          onChange={(e) => setSelectedMouvementBacsIndicateur(e.target.value)}
-                          className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
-                        >
-                          {mouvementBacsIndicateurOptions.map((opt) => (
-                            <option key={opt.key} value={opt.key}>{opt.label}</option>
-                          ))}
-                        </select>
+                      <div className="relative" ref={mouvementBacsDropdownRef}>
+                        <button type="button" onClick={() => setShowMouvementBacsDropdown(!showMouvementBacsDropdown)} className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white">
+                          Produit
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showMouvementBacsDropdown ? 'rotate-180' : ''}`} aria-hidden><path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" /></svg>
+                        </button>
+                        {showMouvementBacsDropdown && (
+                          <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                            {mouvementBacsIndicateurOptions.map((opt) => (
+                              <button key={opt.key} type="button" onClick={() => { setSelectedMouvementBacsIndicateur(opt.key); setShowMouvementBacsDropdown(false); }} className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedMouvementBacsIndicateur === opt.key ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}>
+                                {selectedMouvementBacsIndicateur === opt.key && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                                {getFieldLabel('mouvement-des-bacs', opt.key, opt.label)}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   />
@@ -1671,21 +1747,24 @@ const AnalysesLaboratoireGraphique = () => {
                     embedded={false}
                     weekCompresseurK245Data={duration === 'week' ? weekCompresseurK245Data ?? undefined : undefined}
                     monthCompresseurK245Data={duration === 'month' ? monthCompresseurK245Data ?? undefined : undefined}
-                    leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">Graphique — Compresseur K 245</p>}
+                    leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">{`Graphique — ${getFeuilleTitle('compresseur-k245')}`}</p>}
                     centerSlot={dateControls}
                     rightSlot={(
-                      <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                        <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Indicateur</span>
-                        <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                        <select
-                          value={selectedK245Indicateur}
-                          onChange={(e) => setSelectedK245Indicateur(e.target.value)}
-                          className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
-                        >
-                          {compresseurK245IndicateurOptions.map((opt) => (
-                            <option key={opt.key} value={opt.key}>{opt.label}</option>
-                          ))}
-                        </select>
+                      <div className="relative" ref={k245DropdownRef}>
+                        <button type="button" onClick={() => setShowK245Dropdown(!showK245Dropdown)} className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white">
+                          Indicateur
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showK245Dropdown ? 'rotate-180' : ''}`} aria-hidden><path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" /></svg>
+                        </button>
+                        {showK245Dropdown && (
+                          <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                            {compresseurK245IndicateurOptions.map((opt) => (
+                              <button key={opt.key} type="button" onClick={() => { setSelectedK245Indicateur(opt.key); setShowK245Dropdown(false); }} className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedK245Indicateur === opt.key ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}>
+                                {selectedK245Indicateur === opt.key && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                                {getFieldLabel('compresseur-k245', opt.key, opt.label)}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   />
@@ -1722,21 +1801,24 @@ const AnalysesLaboratoireGraphique = () => {
                     embedded={false}
                     weekCompresseurK244Data={duration === 'week' ? weekCompresseurK244Data ?? undefined : undefined}
                     monthCompresseurK244Data={duration === 'month' ? monthCompresseurK244Data ?? undefined : undefined}
-                    leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">Graphique — Compresseur K 244</p>}
+                    leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">{`Graphique — ${getFeuilleTitle('compresseur-k244')}`}</p>}
                     centerSlot={dateControls}
                     rightSlot={(
-                      <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                        <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Indicateur</span>
-                        <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                        <select
-                          value={selectedK244Indicateur}
-                          onChange={(e) => setSelectedK244Indicateur(e.target.value)}
-                          className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
-                        >
-                          {compresseurK244IndicateurOptions.map((opt) => (
-                            <option key={opt.key} value={opt.key}>{opt.label}</option>
-                          ))}
-                        </select>
+                      <div className="relative" ref={k244DropdownRef}>
+                        <button type="button" onClick={() => setShowK244Dropdown(!showK244Dropdown)} className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white">
+                          Indicateur
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showK244Dropdown ? 'rotate-180' : ''}`} aria-hidden><path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" /></svg>
+                        </button>
+                        {showK244Dropdown && (
+                          <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                            {compresseurK244IndicateurOptions.map((opt) => (
+                              <button key={opt.key} type="button" onClick={() => { setSelectedK244Indicateur(opt.key); setShowK244Dropdown(false); }} className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedK244Indicateur === opt.key ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}>
+                                {selectedK244Indicateur === opt.key && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                                {getFieldLabel('compresseur-k244', opt.key, opt.label)}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   />
@@ -1773,21 +1855,24 @@ const AnalysesLaboratoireGraphique = () => {
                     embedded={false}
                     monthAtmMeroxData={duration === 'month' ? monthAtmMeroxData ?? undefined : undefined}
                     weekAtmMeroxData={duration === 'week' ? weekAtmMeroxData ?? undefined : undefined}
-                    leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">Graphique — Atm/merox & pré flash</p>}
+                    leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">{`Graphique — ${getFeuilleTitle('atm-merox-preflash')}`}</p>}
                     centerSlot={dateControls}
                     rightSlot={(
-                      <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                        <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Indicateur</span>
-                        <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                        <select
-                          value={selectedAtmMeroxIndicateur}
-                          onChange={(e) => setSelectedAtmMeroxIndicateur(e.target.value)}
-                          className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
-                        >
-                          {atmMeroxIndicateurOptions.map((opt) => (
-                            <option key={opt.key} value={opt.key}>{opt.label}</option>
-                          ))}
-                        </select>
+                      <div className="relative" ref={atmMeroxDropdownRef}>
+                        <button type="button" onClick={() => setShowAtmMeroxDropdown(!showAtmMeroxDropdown)} className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white">
+                          Indicateur
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showAtmMeroxDropdown ? 'rotate-180' : ''}`} aria-hidden><path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" /></svg>
+                        </button>
+                        {showAtmMeroxDropdown && (
+                          <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                            {atmMeroxIndicateurOptions.map((opt) => (
+                              <button key={opt.key} type="button" onClick={() => { setSelectedAtmMeroxIndicateur(opt.key); setShowAtmMeroxDropdown(false); }} className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedAtmMeroxIndicateur === opt.key ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}>
+                                {selectedAtmMeroxIndicateur === opt.key && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                                {getFieldLabel('atm-merox-preflash', opt.key, opt.label)}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   />
@@ -1824,21 +1909,24 @@ const AnalysesLaboratoireGraphique = () => {
                   embedded={false}
                   weekGazData={duration === 'week' ? weekGazData ?? undefined : undefined}
                   monthGazData={duration === 'month' ? monthGazData ?? undefined : undefined}
-                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">Graphique — Gaz</p>}
+                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">{`Graphique — ${getFeuilleTitle('gaz')}`}</p>}
                   centerSlot={dateControls}
                   rightSlot={(
-                    <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                      <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Indicateur</span>
-                      <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                      <select
-                        value={selectedGazIndicateur}
-                        onChange={(e) => setSelectedGazIndicateur(e.target.value)}
-                        className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
-                      >
-                        {gazIndicateurOptions.map((opt) => (
-                          <option key={opt.key} value={opt.key}>{opt.label}</option>
-                        ))}
-                      </select>
+                    <div className="relative" ref={gazDropdownRef}>
+                      <button type="button" onClick={() => setShowGazDropdown(!showGazDropdown)} className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white">
+                        Indicateur
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showGazDropdown ? 'rotate-180' : ''}`} aria-hidden><path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" /></svg>
+                      </button>
+                      {showGazDropdown && (
+                        <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                          {gazIndicateurOptions.map((opt) => (
+                            <button key={opt.key} type="button" onClick={() => { setSelectedGazIndicateur(opt.key); setShowGazDropdown(false); }} className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedGazIndicateur === opt.key ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}>
+                              {selectedGazIndicateur === opt.key && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                              {getFieldLabel('gaz', `gaz_${opt.key}`, opt.label)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 />
@@ -1878,34 +1966,62 @@ const AnalysesLaboratoireGraphique = () => {
                   onProductChange={setSelectedProduct}
                   weekAnalysesData={duration === 'week' ? weekAnalysesData ?? undefined : undefined}
                   monthAnalysesData={duration === 'month' ? monthAnalysesData ?? undefined : undefined}
-                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">Graphique — Analyses du laboratoire</p>}
+                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">{`Graphique — ${getFeuilleTitle('analyses-laboratoire')}`}</p>}
                   rightSlot={(
                     <>
-                      <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                        <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Produit</span>
-                        <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                        <select
-                          value={selectedProduct}
-                          onChange={(e) => setSelectedProduct(e.target.value as ProductKey)}
-                          className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
+                      <div className="relative" ref={productDropdownRef}>
+                        <button
+                          type="button"
+                          onClick={() => setShowProductDropdown(!showProductDropdown)}
+                          className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white"
                         >
-                          {products.map((p) => (
-                            <option key={p} value={p}>{productLabels[p]}</option>
-                          ))}
-                        </select>
+                          Produit
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showProductDropdown ? 'rotate-180' : ''}`} aria-hidden>
+                            <path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" />
+                          </svg>
+                        </button>
+                        {showProductDropdown && (
+                          <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                            {products.map((p) => (
+                              <button
+                                key={p}
+                                type="button"
+                                onClick={() => { setSelectedProduct(p as ProductKey); setShowProductDropdown(false); }}
+                                className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedProduct === p ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}
+                              >
+                                {selectedProduct === p && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                                {productLabels[p]}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                        <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Mesure</span>
-                        <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                        <select
-                          value={selectedMeasure}
-                          onChange={(e) => setSelectedMeasure(e.target.value)}
-                          className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
+                      <div className="relative" ref={measureDropdownRef}>
+                        <button
+                          type="button"
+                          onClick={() => setShowMeasureDropdown(!showMeasureDropdown)}
+                          className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white"
                         >
-                          {measureNames.map((m) => (
-                            <option key={m} value={m}>{m}</option>
-                          ))}
-                        </select>
+                          Mesure
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showMeasureDropdown ? 'rotate-180' : ''}`} aria-hidden>
+                            <path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" />
+                          </svg>
+                        </button>
+                        {showMeasureDropdown && (
+                          <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                            {measureNames.map((m) => (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => { setSelectedMeasure(m); setShowMeasureDropdown(false); }}
+                                className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedMeasure === m ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}
+                              >
+                                {selectedMeasure === m && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                                {m}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </>
                   )}
@@ -1930,20 +2046,23 @@ const AnalysesLaboratoireGraphique = () => {
                   embedded={false}
                   weekReformateurData={duration === 'week' ? weekReformateurData ?? undefined : undefined}
                   monthReformateurData={duration === 'month' ? monthReformateurData ?? undefined : undefined}
-                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">Graphique — Réformateur catalytique</p>}
+                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">{`Graphique — ${getFeuilleTitle('reformateur-catalytique')}`}</p>}
                   rightSlot={(
-                    <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                      <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Indicateur</span>
-                      <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                      <select
-                        value={selectedIndicateur}
-                        onChange={(e) => setSelectedIndicateur(e.target.value)}
-                        className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
-                      >
-                        {reformateurIndicateurOptions.map((opt) => (
-                          <option key={opt.key} value={opt.key}>{opt.label}</option>
-                        ))}
-                      </select>
+                    <div className="relative" ref={reformateurDropdownRef}>
+                      <button type="button" onClick={() => setShowReformateurDropdown(!showReformateurDropdown)} className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white">
+                        Indicateur
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showReformateurDropdown ? 'rotate-180' : ''}`} aria-hidden><path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" /></svg>
+                      </button>
+                      {showReformateurDropdown && (
+                        <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                          {reformateurIndicateurOptions.map((opt) => (
+                            <button key={opt.key} type="button" onClick={() => { setSelectedIndicateur(opt.key); setShowReformateurDropdown(false); }} className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedIndicateur === opt.key ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}>
+                              {selectedIndicateur === opt.key && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                              {getFieldLabel('reformateur-catalytique', opt.key, opt.label)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 />
@@ -1967,20 +2086,23 @@ const AnalysesLaboratoireGraphique = () => {
                   embedded={false}
                   weekProductionData={duration === 'week' ? weekProductionData ?? undefined : undefined}
                   monthProductionData={duration === 'month' ? monthProductionData ?? undefined : undefined}
-                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">Graphique — Production</p>}
+                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">{`Graphique — ${getFeuilleTitle('production-valeur-electricite')}`}</p>}
                   rightSlot={(
-                    <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                      <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Indicateur</span>
-                      <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                      <select
-                        value={selectedProductionIndicateur}
-                        onChange={(e) => setSelectedProductionIndicateur(e.target.value)}
-                        className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
-                      >
-                        {productionIndicateurOptions.map((opt) => (
-                          <option key={opt.key} value={opt.key}>{opt.label}</option>
-                        ))}
-                      </select>
+                    <div className="relative" ref={productionDropdownRef}>
+                      <button type="button" onClick={() => setShowProductionDropdown(!showProductionDropdown)} className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white">
+                        Indicateur
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showProductionDropdown ? 'rotate-180' : ''}`} aria-hidden><path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" /></svg>
+                      </button>
+                      {showProductionDropdown && (
+                        <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                          {productionIndicateurOptions.map((opt) => (
+                            <button key={opt.key} type="button" onClick={() => { setSelectedProductionIndicateur(opt.key); setShowProductionDropdown(false); }} className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedProductionIndicateur === opt.key ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}>
+                              {selectedProductionIndicateur === opt.key && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                              {getFieldLabel('production-valeur-electricite', opt.key, opt.label)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 />
@@ -2004,20 +2126,23 @@ const AnalysesLaboratoireGraphique = () => {
                   embedded={false}
                   weekGazData={duration === 'week' ? weekGazData ?? undefined : undefined}
                   monthGazData={duration === 'month' ? monthGazData ?? undefined : undefined}
-                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">Graphique — Gaz</p>}
+                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">{`Graphique — ${getFeuilleTitle('gaz')}`}</p>}
                   rightSlot={(
-                    <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                      <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Indicateur</span>
-                      <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                      <select
-                        value={selectedGazIndicateur}
-                        onChange={(e) => setSelectedGazIndicateur(e.target.value)}
-                        className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
-                      >
-                        {gazIndicateurOptions.map((opt) => (
-                          <option key={opt.key} value={opt.key}>{opt.label}</option>
-                        ))}
-                      </select>
+                    <div className="relative" ref={gazDropdownRef}>
+                      <button type="button" onClick={() => setShowGazDropdown(!showGazDropdown)} className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white">
+                        Indicateur
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showGazDropdown ? 'rotate-180' : ''}`} aria-hidden><path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" /></svg>
+                      </button>
+                      {showGazDropdown && (
+                        <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                          {gazIndicateurOptions.map((opt) => (
+                            <button key={opt.key} type="button" onClick={() => { setSelectedGazIndicateur(opt.key); setShowGazDropdown(false); }} className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedGazIndicateur === opt.key ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}>
+                              {selectedGazIndicateur === opt.key && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                              {getFieldLabel('gaz', `gaz_${opt.key}`, opt.label)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 />
@@ -2041,20 +2166,23 @@ const AnalysesLaboratoireGraphique = () => {
                   weekMouvementBacsData={duration === 'week' ? weekMouvementBacsData ?? undefined : undefined}
                   monthMouvementBacsData={duration === 'month' ? monthMouvementBacsData ?? undefined : undefined}
                   embedded={false}
-                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">Graphique — Mouvement des bacs</p>}
+                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">{`Graphique — ${getFeuilleTitle('mouvement-des-bacs')}`}</p>}
                   rightSlot={(
-                    <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                      <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Produit</span>
-                      <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                      <select
-                        value={selectedMouvementBacsIndicateur}
-                        onChange={(e) => setSelectedMouvementBacsIndicateur(e.target.value)}
-                        className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
-                      >
-                        {mouvementBacsIndicateurOptions.map((opt) => (
-                          <option key={opt.key} value={opt.key}>{opt.label}</option>
-                        ))}
-                      </select>
+                    <div className="relative" ref={mouvementBacsDropdownRef}>
+                      <button type="button" onClick={() => setShowMouvementBacsDropdown(!showMouvementBacsDropdown)} className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white">
+                        Produit
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showMouvementBacsDropdown ? 'rotate-180' : ''}`} aria-hidden><path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" /></svg>
+                      </button>
+                      {showMouvementBacsDropdown && (
+                        <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                          {mouvementBacsIndicateurOptions.map((opt) => (
+                            <button key={opt.key} type="button" onClick={() => { setSelectedMouvementBacsIndicateur(opt.key); setShowMouvementBacsDropdown(false); }} className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedMouvementBacsIndicateur === opt.key ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}>
+                              {selectedMouvementBacsIndicateur === opt.key && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                              {getFieldLabel('mouvement-des-bacs', opt.key, opt.label)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 />
@@ -2078,20 +2206,23 @@ const AnalysesLaboratoireGraphique = () => {
                   embedded={false}
                   monthAtmMeroxData={duration === 'month' ? monthAtmMeroxData ?? undefined : undefined}
                   weekAtmMeroxData={duration === 'week' ? weekAtmMeroxData ?? undefined : undefined}
-                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">Graphique — Atm/merox & pré flash</p>}
+                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">{`Graphique — ${getFeuilleTitle('atm-merox-preflash')}`}</p>}
                   rightSlot={(
-                    <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                      <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Indicateur</span>
-                      <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                      <select
-                        value={selectedAtmMeroxIndicateur}
-                        onChange={(e) => setSelectedAtmMeroxIndicateur(e.target.value)}
-                        className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
-                      >
-                        {atmMeroxIndicateurOptions.map((opt) => (
-                          <option key={opt.key} value={opt.key}>{opt.label}</option>
-                        ))}
-                      </select>
+                    <div className="relative" ref={atmMeroxDropdownRef}>
+                      <button type="button" onClick={() => setShowAtmMeroxDropdown(!showAtmMeroxDropdown)} className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white">
+                        Indicateur
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showAtmMeroxDropdown ? 'rotate-180' : ''}`} aria-hidden><path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" /></svg>
+                      </button>
+                      {showAtmMeroxDropdown && (
+                        <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                          {atmMeroxIndicateurOptions.map((opt) => (
+                            <button key={opt.key} type="button" onClick={() => { setSelectedAtmMeroxIndicateur(opt.key); setShowAtmMeroxDropdown(false); }} className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedAtmMeroxIndicateur === opt.key ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}>
+                              {selectedAtmMeroxIndicateur === opt.key && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                              {getFieldLabel('atm-merox-preflash', opt.key, opt.label)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 />
@@ -2115,20 +2246,23 @@ const AnalysesLaboratoireGraphique = () => {
                   embedded={false}
                   weekCompresseurK245Data={duration === 'week' ? weekCompresseurK245Data ?? undefined : undefined}
                   monthCompresseurK245Data={duration === 'month' ? monthCompresseurK245Data ?? undefined : undefined}
-                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">Graphique — Compresseur K 245</p>}
+                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">{`Graphique — ${getFeuilleTitle('compresseur-k245')}`}</p>}
                   rightSlot={(
-                    <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                      <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Indicateur</span>
-                      <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                      <select
-                        value={selectedK245Indicateur}
-                        onChange={(e) => setSelectedK245Indicateur(e.target.value)}
-                        className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
-                      >
-                        {compresseurK245IndicateurOptions.map((opt) => (
-                          <option key={opt.key} value={opt.key}>{opt.label}</option>
-                        ))}
-                      </select>
+                    <div className="relative" ref={k245DropdownRef}>
+                      <button type="button" onClick={() => setShowK245Dropdown(!showK245Dropdown)} className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white">
+                        Indicateur
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showK245Dropdown ? 'rotate-180' : ''}`} aria-hidden><path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" /></svg>
+                      </button>
+                      {showK245Dropdown && (
+                        <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                          {compresseurK245IndicateurOptions.map((opt) => (
+                            <button key={opt.key} type="button" onClick={() => { setSelectedK245Indicateur(opt.key); setShowK245Dropdown(false); }} className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedK245Indicateur === opt.key ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}>
+                              {selectedK245Indicateur === opt.key && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                              {getFieldLabel('compresseur-k245', opt.key, opt.label)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 />
@@ -2152,20 +2286,23 @@ const AnalysesLaboratoireGraphique = () => {
                   embedded={false}
                   weekCompresseurK244Data={duration === 'week' ? weekCompresseurK244Data ?? undefined : undefined}
                   monthCompresseurK244Data={duration === 'month' ? monthCompresseurK244Data ?? undefined : undefined}
-                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">Graphique — Compresseur K 244</p>}
+                  leftSlot={<p className="text-sm font-semibold text-primary dark:text-white">{`Graphique — ${getFeuilleTitle('compresseur-k244')}`}</p>}
                   rightSlot={(
-                    <div className="flex items-center rounded border border-primary bg-white px-2 py-1 shadow dark:border-[#313d4a] dark:bg-[#313d4a]">
-                      <span className="select-none pr-1.5 text-xs text-bodydark2 dark:text-bodydark1">Indicateur</span>
-                      <span className="mr-1.5 h-3.5 w-px bg-primary/30" />
-                      <select
-                        value={selectedK244Indicateur}
-                        onChange={(e) => setSelectedK244Indicateur(e.target.value)}
-                        className="bg-transparent border-0 text-xs font-bold text-primary outline-none dark:text-white"
-                      >
-                        {compresseurK244IndicateurOptions.map((opt) => (
-                          <option key={opt.key} value={opt.key}>{opt.label}</option>
-                        ))}
-                      </select>
+                    <div className="relative" ref={k244DropdownRef}>
+                      <button type="button" onClick={() => setShowK244Dropdown(!showK244Dropdown)} className="flex cursor-pointer items-center gap-2 rounded border border-primary bg-white px-2 py-1 text-xs font-bold text-primary shadow transition dark:border-[#313d4a] dark:bg-[#313d4a] dark:text-white">
+                        Indicateur
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`shrink-0 transition-transform ${showK244Dropdown ? 'rotate-180' : ''}`} aria-hidden><path fillRule="evenodd" clipRule="evenodd" d="M5.29289 8.29289C5.68342 7.90237 6.31658 7.90237 6.70711 8.29289L12 13.5858L17.2929 8.29289C17.6834 7.90237 18.3166 7.90237 18.7071 8.29289C19.0976 8.68342 19.0976 9.31658 18.7071 9.70711L12.7071 15.7071C12.3166 16.0976 11.6834 16.0976 11.2929 15.7071L5.29289 9.70711C4.90237 9.31658 4.90237 8.68342 5.29289 8.29289Z" fill="currentColor" /></svg>
+                      </button>
+                      {showK244Dropdown && (
+                        <div className="absolute right-0 top-full z-40 mt-2 max-h-72 min-w-[14rem] overflow-y-auto rounded-xl border border-stroke bg-white py-2 shadow-xl dark:border-strokedark dark:bg-boxdark">
+                          {compresseurK244IndicateurOptions.map((opt) => (
+                            <button key={opt.key} type="button" onClick={() => { setSelectedK244Indicateur(opt.key); setShowK244Dropdown(false); }} className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition ${selectedK244Indicateur === opt.key ? 'bg-primary/10 font-medium text-primary dark:bg-primary/20 dark:text-white' : 'text-bodydark2 hover:bg-gray-2 dark:text-white dark:hover:bg-meta-4/60'}`}>
+                              {selectedK244Indicateur === opt.key && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                              {getFieldLabel('compresseur-k244', opt.key, opt.label)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 />

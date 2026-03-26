@@ -14,6 +14,7 @@ import SaisieFeuillePage from './pages/SaisieFeuillePage';
 import SaisieTousPage from './pages/SaisieTousPage';
 import ParametragePage from './pages/ParametragePage';
 import Profile from './pages/Profile';
+import ForceChangePassword from './pages/ForceChangePassword';
 import DefaultLayout from './layout/DefaultLayout';
 import { AnalysesLaboLabelsProvider } from './context/AnalysesLaboLabelsContext';
 import { AnalysesLaboBoundsProvider } from './context/AnalysesLaboBoundsContext';
@@ -82,6 +83,16 @@ function App() {
             <PageTitle />
             <SignUp />
           </>
+        }
+      />
+      {/* Changement de mot de passe forcé (requiert auth mais pas layout complet) */}
+      <Route
+        path="/force-change-password"
+        element={
+          <ProtectedRoute>
+            <PageTitle />
+            <ForceChangePassword />
+          </ProtectedRoute>
         }
       />
       {/* Pages protégées : connexion requise */}

@@ -18,7 +18,7 @@ export const MOUVEMENT_BACS_PRODUCTS = [
   'go de tete',
 ] as const;
 
-export const MOUVEMENT_BACS_HOURS = ['8h', '12h', '16h', '20h', '00h', '04h'] as const;
+export const MOUVEMENT_BACS_HOURS = ['04h', '8h', '12h', '16h', '20h', '00h'] as const;
 export type MouvementBacsHourKey = (typeof MOUVEMENT_BACS_HOURS)[number];
 
 export interface HourRow {

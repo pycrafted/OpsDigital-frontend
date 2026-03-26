@@ -6,14 +6,15 @@ export interface User {
   id?: number;
   fullName: string;
   email: string;
-  poste: string;
-  avatarUrl?: string | null;
+  role: 'admin' | 'simple_user';
+  mustChangePassword: boolean;
 }
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   loading: boolean;
+  isAdmin: boolean;
 }
 
 interface AuthContextValue extends AuthState {
@@ -28,8 +29,8 @@ function authUserToUser(a: authApi.AuthUser): User {
     id: a.id,
     fullName: a.fullName ?? '',
     email: a.email ?? '',
-    poste: a.poste ?? '',
-    avatarUrl: a.avatarUrl ?? null,
+    role: a.role ?? 'simple_user',
+    mustChangePassword: a.mustChangePassword ?? false,
   };
 }
 
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const isAuthenticated = user !== null;
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     let cancelled = false;
@@ -92,7 +94,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateUser = useCallback(async (updates: Partial<User>) => {
     const payload: authApi.UpdateMePayload = {};
     if (updates.fullName !== undefined) payload.fullName = updates.fullName;
-    if (updates.poste !== undefined) payload.poste = updates.poste;
     if (updates.email !== undefined) payload.email = updates.email;
     const u = await authApi.updateMe(payload);
     setUser(authUserToUser(u));
@@ -107,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     isAuthenticated,
     loading,
+    isAdmin: isAdmin ?? false,
     login,
     logout,
     updateUser,

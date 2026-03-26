@@ -5,8 +5,12 @@ import {
   type HourRow,
 } from '../../data/compresseurK244';
 import { useCompresseurK244Labels } from '../../context/CompresseurK244LabelsContext';
+import { useRenommage } from '../../context/RenommageContext';
 import { useCompresseurK244Bounds } from '../../context/CompresseurK244BoundsContext';
 import { useTableView } from '../../context/TableViewContext';
+import { fetchTableSettings, saveTableSettings } from '../../api/tableSettings';
+
+const FEUILLE_ID = "compresseur-k244";
 
 const hours = [...COMPRESSEUR_K244_HOURS];
 const allSubRowNames = [...new Set(categories.flatMap((c) => c.subRows))] as string[];
@@ -60,9 +64,124 @@ const TableCompresseurK244 = ({
   sectionTitle,
   showInlineDate = false,
 }: TableCompresseurK244Props) => {
-  const { getHourLabel, getCategoryLabel, getMeasureLabel } = useCompresseurK244Labels();
+  const { getHourLabel } = useCompresseurK244Labels();
+  const { getCategoryLabel: _getCat, getFieldLabel } = useRenommage();
+  const getCategoryLabel = (cat: string) => _getCat('compresseur-k244', cat);
+  const getMeasureLabel = (key: string, defaultLabel?: string) => getFieldLabel('compresseur-k244', key, defaultLabel ?? key);
   const { isOutOfBounds } = useCompresseurK244Bounds();
   const { hideEmptyColumns, canEdit } = useTableView();
+
+  // --- Drag & drop column order ---
+  type DragState = { type: "category"; cat: string } | { type: "subrow"; cat: string; sub: string } | null;
+  type DropTarget = { type: "category"; cat: string; side: "left" | "right" } | { type: "subrow"; cat: string; sub: string; side: "left" | "right" } | null;
+
+  const defaultCatOrder = categories.map((c) => c.category);
+  const defaultSubRowOrders: Record<string, string[]> = {};
+  categories.forEach((c) => { defaultSubRowOrders[c.category] = [...c.subRows]; });
+
+  const [categoryOrder, setCategoryOrder] = React.useState<string[]>(defaultCatOrder);
+  const [subRowOrders, setSubRowOrders] = React.useState<Record<string, string[]>>(defaultSubRowOrders);
+
+  const saveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragStateRef = React.useRef<DragState>(null);
+  const [dropTarget, setDropTarget] = React.useState<DropTarget>(null);
+
+  React.useEffect(() => {
+    fetchTableSettings(FEUILLE_ID).then((s) => {
+      if (Array.isArray(s["column_order"])) setCategoryOrder(s["column_order"] as string[]);
+      else {
+        try { const v = localStorage.getItem("k244_column_order"); if (v) setCategoryOrder(JSON.parse(v) as string[]); } catch (_) {}
+      }
+      if (s["subrow_orders"] && typeof s["subrow_orders"] === "object" && !Array.isArray(s["subrow_orders"])) {
+        setSubRowOrders(s["subrow_orders"] as Record<string, string[]>);
+      } else {
+        try { const v = localStorage.getItem("k244_subrow_orders"); if (v) setSubRowOrders(JSON.parse(v) as Record<string, string[]>); } catch (_) {}
+      }
+    }).catch((_) => {
+      try { const v = localStorage.getItem("k244_column_order"); if (v) setCategoryOrder(JSON.parse(v) as string[]); } catch (_2) {}
+      try { const v = localStorage.getItem("k244_subrow_orders"); if (v) setSubRowOrders(JSON.parse(v) as Record<string, string[]>); } catch (_2) {}
+    });
+  }, []);
+
+  function scheduleSave(colOrder: string[], subOrders: Record<string, string[]>) {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      localStorage.setItem("k244_column_order", JSON.stringify(colOrder));
+      localStorage.setItem("k244_subrow_orders", JSON.stringify(subOrders));
+      saveTableSettings(FEUILLE_ID, { column_order: colOrder, subrow_orders: subOrders }).catch((_) => {});
+    }, 800);
+  }
+
+  function getSide(e: React.DragEvent<HTMLTableCellElement>): "left" | "right" {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    return e.clientX < rect.left + rect.width / 2 ? "left" : "right";
+  }
+
+  function handleCatDragStart(e: React.DragEvent<HTMLTableCellElement>, cat: string) {
+    dragStateRef.current = { type: "category", cat };
+    e.dataTransfer.effectAllowed = "move";
+  }
+  function handleCatDragOver(e: React.DragEvent<HTMLTableCellElement>, cat: string) {
+    e.preventDefault();
+    if (!dragStateRef.current || dragStateRef.current.type !== "category") return;
+    setDropTarget({ type: "category", cat, side: getSide(e) });
+  }
+  function handleCatDrop(e: React.DragEvent<HTMLTableCellElement>, toCat: string) {
+    e.preventDefault();
+    const ds = dragStateRef.current;
+    if (!ds || ds.type !== "category" || ds.cat === toCat) { setDropTarget(null); return; }
+    const side = getSide(e);
+    const arr = [...categoryOrder];
+    const fromIdx = arr.indexOf(ds.cat);
+    if (fromIdx === -1) { setDropTarget(null); return; }
+    arr.splice(fromIdx, 1);
+    let toIdx = arr.indexOf(toCat);
+    if (toIdx === -1) { setDropTarget(null); return; }
+    if (side === "right") toIdx += 1;
+    arr.splice(toIdx, 0, ds.cat);
+    setCategoryOrder(arr);
+    scheduleSave(arr, subRowOrders);
+    setDropTarget(null);
+    dragStateRef.current = null;
+  }
+
+  function handleSubDragStart(e: React.DragEvent<HTMLTableCellElement>, cat: string, sub: string) {
+    dragStateRef.current = { type: "subrow", cat, sub };
+    e.dataTransfer.effectAllowed = "move";
+  }
+  function handleSubDragOver(e: React.DragEvent<HTMLTableCellElement>, cat: string, sub: string) {
+    e.preventDefault();
+    const ds = dragStateRef.current;
+    if (!ds || ds.type !== "subrow" || ds.cat !== cat) return;
+    setDropTarget({ type: "subrow", cat, sub, side: getSide(e) });
+  }
+  function handleSubDrop(e: React.DragEvent<HTMLTableCellElement>, cat: string, toSub: string) {
+    e.preventDefault();
+    const ds = dragStateRef.current;
+    if (!ds || ds.type !== "subrow" || ds.cat !== cat || ds.sub === toSub) { setDropTarget(null); return; }
+    const side = getSide(e);
+    const base = subRowOrders[cat] ?? categories.find((c) => c.category === cat)?.subRows ?? [];
+    const arr = [...base];
+    const fromIdx = arr.indexOf(ds.sub);
+    if (fromIdx === -1) { setDropTarget(null); return; }
+    arr.splice(fromIdx, 1);
+    let toIdx = arr.indexOf(toSub);
+    if (toIdx === -1) { setDropTarget(null); return; }
+    if (side === "right") toIdx += 1;
+    arr.splice(toIdx, 0, ds.sub);
+    const newOrders = { ...subRowOrders, [cat]: arr };
+    setSubRowOrders(newOrders);
+    scheduleSave(categoryOrder, newOrders);
+    setDropTarget(null);
+    dragStateRef.current = null;
+  }
+
+  function clearDrag() {
+    dragStateRef.current = null;
+    setDropTarget(null);
+  }
+  // --- end drag & drop ---
+
   const [selectedHours, setSelectedHours] = React.useState<string[]>(hours.map((h) => h));
   const [selectedCategories, setSelectedCategories] = React.useState<string[]>(categories.map(c => c.category));
   const [selectedSubRows, setSelectedSubRows] = React.useState<string[]>([...allSubRowNames]);
@@ -145,15 +264,23 @@ const TableCompresseurK244 = ({
 
   // Filter data based on selections
   const filteredHours = hours.filter((h) => selectedHours.includes(h));
-  const filteredCategories = categories.filter((c) => selectedCategories.includes(c.category));
+  const filteredCategories = categories
+    .filter((c) => selectedCategories.includes(c.category))
+    .sort((a, b) => {
+      const ai = categoryOrder.indexOf(a.category);
+      const bi = categoryOrder.indexOf(b.category);
+      return (ai === -1 ? 9999 : ai) - (bi === -1 ? 9999 : bi);
+    });
   const currentCategories = filteredCategories
-    .map((cat) => ({
-      ...cat,
-      subRows: cat.subRows.filter((sub) => selectedSubRows.includes(sub)),
-    }))
+    .map((cat) => {
+      const orderedSubs = (subRowOrders[cat.category] ?? cat.subRows).filter((s) => cat.subRows.includes(s) && selectedSubRows.includes(s));
+      return { ...cat, subRows: orderedSubs };
+    })
     .filter((cat) => cat.subRows.length > 0);
 
-  const filteredData = data.filter((hourRow) => filteredHours.includes(hourRow.hour as (typeof hours)[number]));
+  const filteredData = filteredHours
+    .map((h) => data.find((row) => row.hour === h))
+    .filter((row): row is HourRow => row != null);
   const totalRows = filteredData.length;
   const visibleCategories = hideEmptyColumns
     ? currentCategories
@@ -398,26 +525,44 @@ const TableCompresseurK244 = ({
                   className="sticky left-0 z-20 w-28 min-w-[6.5rem] max-w-[7rem] border-r border-stroke/70 border-t-0 border-l-0 bg-[#eff6ff] py-1.5 pl-2 pr-2 dark:border-strokedark dark:border-t-0 dark:border-l-0 dark:bg-[#273342]"
                   aria-label=""
                 />
-                {visibleCategories.map((cat) => (
-                  <th
-                    key={cat.category}
-                    colSpan={cat.subRows.length}
-                    className="sticky top-0 z-10 min-w-0 border-b border-r border-stroke/70 bg-primary py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark"
-                  >
-                    {getCategoryLabel(cat.category)}
-                  </th>
-                ))}
+                {visibleCategories.map((cat) => {
+                  const isDraggingThis = dragStateRef.current?.type === "category" && dragStateRef.current.cat === cat.category;
+                  const isDropHere = dropTarget?.type === "category" && dropTarget.cat === cat.category;
+                  return (
+                    <th
+                      key={cat.category}
+                      colSpan={cat.subRows.length}
+                      draggable={canEdit}
+                      onDragStart={(e) => handleCatDragStart(e, cat.category)}
+                      onDragOver={(e) => handleCatDragOver(e, cat.category)}
+                      onDrop={(e) => handleCatDrop(e, cat.category)}
+                      onDragEnd={clearDrag}
+                      onDragLeave={() => setDropTarget(null)}
+                      className={`sticky top-0 z-10 min-w-0 border-b border-r border-stroke/70 py-1.5 px-2 text-center text-xs font-semibold uppercase tracking-wider text-white dark:border-strokedark select-none transition-colors ${canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${isDraggingThis ? "bg-[#0d1a47]" : "bg-primary"} ${isDropHere && dropTarget?.side === "left" ? "border-l-[3px] border-l-yellow-300" : ""} ${isDropHere && dropTarget?.side === "right" ? "border-r-[3px] border-r-yellow-300" : ""}`}
+                    >
+                      {getCategoryLabel(cat.category)}
+                    </th>
+                  );
+                })}
               </tr>
               <tr>
                 {visibleCategories.flatMap((cat) =>
                   cat.subRows.map((subRow) => {
                     const mKey = `${cat.category}_${subRow}`;
+                    const isDraggingThis = dragStateRef.current?.type === "subrow" && dragStateRef.current.cat === cat.category && dragStateRef.current.sub === subRow;
+                    const isDropHere = dropTarget?.type === "subrow" && dropTarget.cat === cat.category && dropTarget.sub === subRow;
                     return (
                       <th
                         key={mKey}
-                        className="sticky top-7 z-10 w-[7rem] min-w-[7rem] max-w-[7rem] border-r border-b border-stroke/70 bg-primary/90 py-1 px-1 text-center text-[11px] font-medium text-white/95 dark:border-strokedark"
+                        draggable={canEdit}
+                        onDragStart={(e) => handleSubDragStart(e, cat.category, subRow)}
+                        onDragOver={(e) => handleSubDragOver(e, cat.category, subRow)}
+                        onDrop={(e) => handleSubDrop(e, cat.category, subRow)}
+                        onDragEnd={clearDrag}
+                        onDragLeave={() => setDropTarget(null)}
+                        className={`sticky top-7 z-10 w-[7rem] min-w-[7rem] max-w-[7rem] border-r border-b border-stroke/70 py-1 px-1 text-center text-[11px] font-medium text-white/95 dark:border-strokedark select-none transition-colors ${canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${isDraggingThis ? "bg-[#0d1a47]" : "bg-primary/90"} ${isDropHere && dropTarget?.side === "left" ? "border-l-[3px] border-l-yellow-300" : ""} ${isDropHere && dropTarget?.side === "right" ? "border-r-[3px] border-r-yellow-300" : ""}`}
                       >
-                        <span className="block truncate" title={getMeasureLabel(mKey)}>{getMeasureLabel(mKey)}</span>
+                        <span className="block truncate" title={getMeasureLabel(mKey, subRow)}>{getMeasureLabel(mKey, subRow)}</span>
                       </th>
                     );
                   })

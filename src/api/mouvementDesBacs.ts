@@ -60,6 +60,27 @@ export async function fetchMouvementBacsByDateRange(
 }
 
 /**
+ * Télécharge le tableau Mouvement des bacs sur une plage de dates en format Excel (.xlsx).
+ * Un onglet par jour dans le fichier généré.
+ */
+export async function exportMouvementDesBacsExcel(start: string, end: string): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/api/mouvement-des-bacs/export-excel/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+    { headers: getAuthHeaders() },
+  );
+  if (!res.ok) {
+    throw new Error(`Erreur export: ${res.status}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `mouvement_des_bacs_${start}_${end}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
  * Enregistre toutes les lignes pour une date (bulk). Chaque ligne peut avoir values et bacs.
  */
 export async function saveMouvementBacsBulk(
